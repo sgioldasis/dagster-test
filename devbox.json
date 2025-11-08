@@ -7,14 +7,24 @@
     "nodejs@latest",
     "uv@latest",
     "duckdb@latest",
+    "podman@latest",
+    "podman-compose@latest",
+    "postgresql@latest",
   ],
   "env": {
     "DEVBOX_COREPACK_ENABLED": "1",
+    "PGHOST": "/tmp"
+
   },
   "shell": {
     "init_hook": [
-      ". $VENV_DIR/bin/activate",
-      "uv pip install  -r requirements.txt",
+      ". $VENV_DIR/bin/activate > /dev/null 2>&1",
+      "uv pip install  -r requirements.txt > /dev/null 2>&1",
+      "if ! podman machine list | grep -q 'Currently running'; then podman machine start > /dev/null 2>&1; fi",
+      "# --- PostgreSQL Server Management ---",
+      "mkdir -p .devbox/var/log",
+      "if [ ! -d \".devbox/var/lib/postgres/base\" ]; then initdb -D .devbox/var/lib/postgres; fi",
+      "pg_ctl status -D .devbox/var/lib/postgres > /dev/null 2>&1 || (pg_ctl -D .devbox/var/lib/postgres -l .devbox/var/log/postgres.log -w start)"
     ],
   },
 }

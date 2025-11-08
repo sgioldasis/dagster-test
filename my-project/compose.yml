@@ -1,0 +1,16 @@
+# compose.yml for PostgreSQL
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: dev-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      # The default user for postgres is 'postgres'
+      - POSTGRES_PASSWORD=YourStrong@Passw0rd
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

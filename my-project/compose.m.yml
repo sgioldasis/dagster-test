@@ -1,0 +1,35 @@
+# compose.yml
+
+services:
+  # This is the name of our service. You can call it anything, e.g., 'db' or 'sql'.
+  sqlserver:
+    # The official Microsoft SQL Server image for Linux
+    image: mcr.microsoft.com/mssql/server:2022-latest
+
+    # A container name makes it easier to reference
+    container_name: dev-sqlserver
+
+    # Ports are mapped as HOST:CONTAINER
+    # This maps port 1433 on your machine to port 1433 in the container.
+    ports:
+      - "1433:1433"
+
+    # Environment variables are required for SQL Server
+    environment:
+      # You MUST accept the EULA to run the image
+      - ACCEPT_EULA=Y
+      # Set a strong password for the 'sa' (system administrator) user.
+      # IMPORTANT: Change this to your own strong password!
+      - SA_PASSWORD=YourStrong@Passw0rd
+      # Use the 'Developer' edition, which is free for development
+      - MSSQL_PID=Developer
+
+    # Volumes are used for persistent data.
+    # This creates a named volume 'sqlserver_data' and maps it to the
+    # data directory inside the container. Your databases will be stored here.
+    volumes:
+      - sqlserver_data:/var/opt/mssql/data
+
+# Define the named volume at the top level
+volumes:
+  sqlserver_data:

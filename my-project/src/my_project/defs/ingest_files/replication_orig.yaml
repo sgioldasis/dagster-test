@@ -1,4 +1,4 @@
-source: POSTGRES_CONN
+source: LOCAL
 target: DUCKDB
 
 defaults:
@@ -6,9 +6,9 @@ defaults:
   object: "{stream_table}"
 
 streams:
-  public.raw_customers:
+  file://raw_customers.csv:
     object: "main.raw_customers"
-  public.raw_orders:
+  file://raw_orders.csv:
     object: "main.raw_orders"
-  public.raw_payments:
+  file://raw_payments.csv:
     object: "main.raw_payments"

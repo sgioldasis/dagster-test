@@ -1,0 +1,22 @@
+# compose.yml
+
+services:
+  sqlserver:
+    # The image is now pulled from quay.io
+    image: quay.io/microsoft/mssql-server:2022-latest
+
+    container_name: dev-sqlserver
+
+    ports:
+      - "1433:1433"
+
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Developer
+
+    volumes:
+      - sqlserver_data:/var/opt/mssql/data
+
+volumes:
+  sqlserver_data:
