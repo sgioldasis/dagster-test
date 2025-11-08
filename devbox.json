@@ -1,6 +1,8 @@
 {
   "env": {
     "UV_PYTHON": "$PWD/.venv/bin/python",
+    "DEVBOX_COREPACK_ENABLED": "1",
+    "PGHOST": "/tmp"
   },
   "packages": [
     "python@3.13",
@@ -9,13 +11,8 @@
     "duckdb@latest",
     "podman@latest",
     "podman-compose@latest",
-    "postgresql@latest",
+    "postgresql@latest"
   ],
-  "env": {
-    "DEVBOX_COREPACK_ENABLED": "1",
-    "PGHOST": "/tmp"
-
-  },
   "shell": {
     "init_hook": [
       ". $VENV_DIR/bin/activate > /dev/null 2>&1",
@@ -25,6 +22,6 @@
       "mkdir -p .devbox/var/log",
       "if [ ! -d \".devbox/var/lib/postgres/base\" ]; then initdb -D .devbox/var/lib/postgres; fi",
       "pg_ctl status -D .devbox/var/lib/postgres > /dev/null 2>&1 || (pg_ctl -D .devbox/var/lib/postgres -l .devbox/var/log/postgres.log -w start)"
-    ],
-  },
+    ]
+  }
 }
