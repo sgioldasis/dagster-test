@@ -1,8 +1,18 @@
 jdbt:
   outputs:
+    # prod:
+    #   type: duckdb
+    #   path: /tmp/jaffle_platform.duckdb
+    #   threads: 1
     prod:
-      type: duckdb
-      path: /tmp/jaffle_platform.duckdb
+      type: databricks
+      catalog: test
+      host: "dbc-a8f6bc8e-f728.cloud.databricks.com"
+      http_path: "/sql/1.0/warehouses/333120755706219a"
+      schema: main
       threads: 1
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      auth_type: databricks_cli
+      # auth_type: oauth
 
   target: prod

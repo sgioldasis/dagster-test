@@ -6,6 +6,7 @@ dependencies = [
     "dagster==1.12.1",
     "dagster-dbt>=0.28.1",
     "dagster-sling>=0.28.1",
+    "dbt-databricks>=1.10.14",
     "dbt-duckdb>=1.10.0",
 ]
 

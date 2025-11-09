@@ -1,5 +1,6 @@
 source: POSTGRES_CONN
-target: DUCKDB
+# target: DUCKDB
+target: DATABRICKS
 
 defaults:
   mode: full-refresh
