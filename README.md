@@ -1,6 +1,6 @@
 # Project description
 
-A small test project for experimenting with Dagster pipelines and local development workflows using Devbox. The repository contains example Dagster jobs, Dagster component configuration for local runs, and supporting scripts to make it easy to iterate on pipeline code.
+This project is a testbed for experimenting with Dagster pipelines and local development workflows using Devbox. It provides example Dagster jobs, component configurations, and scripts to streamline pipeline development and iteration. The repository demonstrates how to ingest data from CSV files, orchestrate data pipelines with Dagster, and integrate with dbt for data transformation. It also includes instructions for setting up the environment, running the Dagster UI, and managing data with tools like Sling and Podman. The project is ideal for learning and prototyping modern data engineering workflows in a local environment.
 
 ## Prerequisites
 - Environment variables
