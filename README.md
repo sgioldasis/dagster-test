@@ -142,3 +142,11 @@ dg launch --assets target/main/stg_payments
 # We can check the data is in Duckdb
 duckdb /tmp/jaffle_platform.duckdb -c "SELECT * FROM stg_payments LIMIT 5"
 
+# Scaffold the schedule
+dg scaffold defs dagster.schedule jaffle_schedule.py
+# Note: This will create defs at dlt_project/defs/jaffle_schedule.py.
+# Then we edit the defs
+
+# We check the defs
+# This checks all the definitions (not just the yaml ones)
+dg check defs
