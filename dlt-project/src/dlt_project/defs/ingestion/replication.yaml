@@ -7,9 +7,9 @@ defaults:
   replication_key: updated_at
 
 streams:
-  file://raw_customers.csv:
+  file://data/raw_customers.csv:
     object: "main.raw_customers"
-  file://raw_orders.csv:
+  file://data/raw_orders.csv:
     object: "main.raw_orders"
-  file://raw_payments.csv:
+  file://data/raw_payments.csv:
     object: "main.raw_payments"
