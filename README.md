@@ -7,6 +7,7 @@ This project is a testbed for experimenting with Dagster pipelines and local dev
     - In your .bashrc or .zshrc add the following:
     ```
     export DATABRICKS_TOKEN=<your databricks token>
+    export SQL_SERVER_PASSWORD=<your sql server password>
     ```
 - Install Devbox (https://www.jetify.com/devbox)
 
@@ -51,8 +52,22 @@ psql -h localhost -d jaffle_shop
 ### Sling
 
 ```bash
+# Setup POSTGRES_CONN connection
+sling conns set POSTGRES_CONN url="postgresql://localhost:5432/jaffle_shop?sslmode=disable"
+
+# Setup SQL_SERVER connection
+sling conns set SQL_SERVER type=sqlserver host=savas-sqlserver.database.windows.net port=1433 database=TestDB user=sqladminuser password=$SQL_SERVER_PASSWORD sslmode=
+
+# 6:40PM INF connection `SQL_SERVER` has been set in /Users/s.gioldasis-si/.sling/env.yaml. Please test with `sling conns test SQL_SERVER`
+
+# Test SQL_SERVER connection
+sling conns test SQL_SERVER
+# 6:40PM INF success!
+
 # List connections
 sling conns list
+# To see the connections info
+cat ~/.sling/env.yaml 
 
 # Load data from local CSV files into PostgreSQL
 sling run \
@@ -69,6 +84,22 @@ sling run \
   --src-conn "file://data/raw_payments.csv" \
   --tgt-conn POSTGRES_CONN \
   --tgt-object public.raw_payments
+
+# Load data from local CSV files into SQL Server
+sling run \
+  --src-conn "file://data/raw_customers.csv" \
+  --tgt-conn SQL_SERVER \
+  --tgt-object dbo.raw_customers
+
+sling run \
+  --src-conn "file://data/raw_orders.csv" \
+  --tgt-conn SQL_SERVER \
+  --tgt-object dbo.raw_orders
+
+sling run \
+  --src-conn "file://data/raw_payments.csv" \
+  --tgt-conn SQL_SERVER \
+  --tgt-object dbo.raw_payments
 
 ```
 

@@ -1,8 +1,8 @@
 {
   "env": {
-    "UV_PYTHON": "$PWD/.venv/bin/python",
+    "UV_PYTHON":               "$PWD/.venv/bin/python",
     "DEVBOX_COREPACK_ENABLED": "1",
-    "PGHOST": "/tmp"
+    "PGHOST":                  "/tmp"
   },
   "packages": [
     "python@3.13",
@@ -11,7 +11,8 @@
     "duckdb@latest",
     "podman@latest",
     "podman-compose@latest",
-    "postgresql@latest"
+    "postgresql@latest",
+    "sqlcmd@latest"
   ],
   "shell": {
     "init_hook": [

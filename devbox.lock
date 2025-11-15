@@ -544,6 +544,54 @@
         }
       }
     },
+    "sqlcmd@latest": {
+      "last_modified": "2025-10-22T20:59:19Z",
+      "resolved": "github:NixOS/nixpkgs/01b6809f7f9d1183a2b3e081f0a1e6f8f415cb09#sqlcmd",
+      "source": "devbox-search",
+      "version": "1.8.3",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4y6vqr80q6lrs1fb6ck01nj8qfd996lb-sqlcmd-1.8.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4y6vqr80q6lrs1fb6ck01nj8qfd996lb-sqlcmd-1.8.3"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/vha3578sgys3b2sylz1yrlk8jrdcgxy1-sqlcmd-1.8.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/vha3578sgys3b2sylz1yrlk8jrdcgxy1-sqlcmd-1.8.3"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/w2ahnbdc0sxsmyzqm43gfin0nb5pgkmy-sqlcmd-1.8.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/w2ahnbdc0sxsmyzqm43gfin0nb5pgkmy-sqlcmd-1.8.3"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/s57wcrhp2vbm56i9nipa0ip3xcypm0d9-sqlcmd-1.8.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/s57wcrhp2vbm56i9nipa0ip3xcypm0d9-sqlcmd-1.8.3"
+        }
+      }
+    },
     "uv@latest": {
       "last_modified": "2025-10-22T20:59:19Z",
       "resolved": "github:NixOS/nixpkgs/01b6809f7f9d1183a2b3e081f0a1e6f8f415cb09#uv",

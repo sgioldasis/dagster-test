@@ -1,4 +1,5 @@
-source: POSTGRES_CONN
+# source: POSTGRES_CONN
+source: SQL_SERVER
 # target: DUCKDB
 target: DATABRICKS
 
@@ -7,9 +8,12 @@ defaults:
   object: "{stream_table}"
 
 streams:
-  public.raw_customers:
+  # For POSTGRES - public.raw_customers:
+  dbo.raw_customers:
     object: "main.raw_customers"
-  public.raw_orders:
+  # For POSTGRES - public.raw_orders:
+  dbo.raw_orders:
     object: "main.raw_orders"
-  public.raw_payments:
+  # For POSTGRES - public.raw_payments:
+  dbo.raw_payments:
     object: "main.raw_payments"
