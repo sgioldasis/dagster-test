@@ -1,6 +1,54 @@
 {
   "lockfile_version": "1",
   "packages": {
+    "bat@latest": {
+      "last_modified": "2025-11-15T07:28:48Z",
+      "resolved": "github:NixOS/nixpkgs/1d4c88323ac36805d09657d13a5273aea1b34f0c#bat",
+      "source": "devbox-search",
+      "version": "0.26.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/bvair8i8ih4pcww6iw5146wppf46mgrb-bat-0.26.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/bvair8i8ih4pcww6iw5146wppf46mgrb-bat-0.26.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/dgvryqpl27yxgcwxx6irvf4ra91492ia-bat-0.26.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/dgvryqpl27yxgcwxx6irvf4ra91492ia-bat-0.26.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/iwy9yq1rcb0k3qa7q8zinlv8yi2yb20g-bat-0.26.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/iwy9yq1rcb0k3qa7q8zinlv8yi2yb20g-bat-0.26.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/ryaxw8pzh3mg7r4mg46zfj8qg2hapbz0-bat-0.26.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/ryaxw8pzh3mg7r4mg46zfj8qg2hapbz0-bat-0.26.0"
+        }
+      }
+    },
     "duckdb@latest": {
       "last_modified": "2025-10-24T23:52:36Z",
       "resolved": "github:NixOS/nixpkgs/02f2cb8e0feb4596d20cc52fda73ccee960e3538#duckdb",

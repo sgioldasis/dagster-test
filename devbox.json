@@ -12,7 +12,8 @@
     "podman@latest",
     "podman-compose@latest",
     "postgresql@latest",
-    "sqlcmd@latest"
+    "sqlcmd@latest",
+    "bat@latest"
   ],
   "shell": {
     "init_hook": [
