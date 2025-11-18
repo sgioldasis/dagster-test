@@ -22,7 +22,11 @@
       "# --- PostgreSQL Server Management ---",
       "mkdir -p .devbox/var/log",
       "if [ ! -d \".devbox/var/lib/postgres/base\" ]; then initdb -D .devbox/var/lib/postgres; fi",
-      "pg_ctl status -D .devbox/var/lib/postgres > /dev/null 2>&1 || (pg_ctl -D .devbox/var/lib/postgres -l .devbox/var/log/postgres.log -w start)"
+      "pg_ctl status -D .devbox/var/lib/postgres > /dev/null 2>&1 || (pg_ctl -D .devbox/var/lib/postgres -l .devbox/var/log/postgres.log -w start)",
+      "# Silent dbt Fusion installation",
+      "if ! command -v dbtf &> /dev/null; then",
+      "  curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update > /dev/null 2>&1 && echo 'dbt Fusion installed' || echo 'dbt Fusion install failed'",
+      "fi"
     ]
   }
 }
