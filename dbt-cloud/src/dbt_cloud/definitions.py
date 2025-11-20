@@ -1,6 +1,8 @@
 import os
 import time
-import requests # Import the requests library
+import json
+import urllib.request
+import urllib.error
 
 import dagster as dg
 from dagster_dbt.cloud_v2.resources import (
@@ -36,13 +38,13 @@ dbt_cloud_sensor = build_dbt_cloud_polling_sensor(workspace=workspace_for_defs)
 
 
 # ==============================================================================
-# 2. THE WORKAROUND OP (manual instantiation)
+# 2. THE FINAL OP (using urllib)
 # ==============================================================================
 @dg.op
 def trigger_dbt_cloud_run_manual(context: dg.OpExecutionContext) -> int:
     """
-    Manually triggers a dbt Cloud run using the correct API endpoint
-    and polls for completion.
+    Triggers a dbt Cloud run and polls for completion using the
+    built-in `urllib` library. This is a robust, dependency-free solution.
     """
     # Get the job_id from the op's run configuration
     job_id = context.op_config["job_id"]
@@ -58,52 +60,59 @@ def trigger_dbt_cloud_run_manual(context: dg.OpExecutionContext) -> int:
         environment_id=int(os.getenv("DBT_CLOUD_ENVIRONMENT_ID")),
     )
 
-    # --- 1. Trigger the dbt Cloud run (using the correct endpoint) ---
+    # --- 1. Trigger the dbt Cloud run ---
     context.log.info(f"Triggering dbt Cloud job {job_id}...")
     
-    # FIX: Use the /jobs/{job_id}/run/ endpoint
+    # Use the correct endpoint that we know works
     trigger_url = f"{workspace.credentials.access_url.rstrip('/')}/api/v2/accounts/{workspace.credentials.account_id}/jobs/{job_id}/run/"
-    headers = {"Authorization": f"Token {workspace.credentials.token}"}
-    
-    # FIX: The payload only needs the 'cause'
+    headers = {
+        "Authorization": f"Token {workspace.credentials.token}",
+        "Content-Type": "application/json",
+    }
     payload = {
         "cause": f"Triggered by Dagster job '{context.job_name}'",
     }
 
     try:
-        response = requests.post(trigger_url, headers=headers, json=payload)
-        response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
-        run_data = response.json()
-        run_id = run_data["data"]["id"]
-        context.log.info(f"Successfully triggered dbt Cloud run. Run ID: {run_id}")
-    except requests.exceptions.RequestException as e:
+        # Prepare the request using urllib
+        payload_bytes = json.dumps(payload).encode('utf-8')
+        request = urllib.request.Request(trigger_url, data=payload_bytes, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(request) as response:
+            run_data = json.loads(response.read().decode('utf-8'))
+            run_id = run_data["data"]["id"]
+            context.log.info(f"Successfully triggered dbt Cloud run. Run ID: {run_id}")
+
+    except (urllib.error.HTTPError, urllib.error.URLError) as e:
         raise dg.Failure(f"Failed to trigger dbt Cloud run: {e}")
 
-    # --- 2. Poll for the run to finish (this part was already correct) ---
+    # --- 2. Poll for the run to finish ---
     context.log.info(f"Polling for run {run_id} to complete...")
     poll_url = f"{workspace.credentials.access_url.rstrip('/')}/api/v2/accounts/{workspace.credentials.account_id}/runs/{run_id}/"
     
     while True:
         try:
-            response = requests.get(poll_url, headers=headers)
-            response.raise_for_status()
-            run_data = response.json()
-            status = run_data["data"]["status_humanized"]
+            # Prepare the GET request for polling
+            poll_request = urllib.request.Request(poll_url, headers=headers, method='GET')
             
-            context.log.info(f"Run {run_id} status: {status}")
+            with urllib.request.urlopen(poll_request) as response:
+                run_data = json.loads(response.read().decode('utf-8'))
+                status = run_data["data"]["status_humanized"]
+                
+                context.log.info(f"Run {run_id} status: {status}")
 
-            if status in ["Success", "Completed"]:
-                context.log.info(f"dbt Cloud run {run_id} completed successfully.")
-                break
-            elif status in ["Failed", "Cancelled", "Error"]:
-                raise dg.Failure(
-                    description=f"dbt Cloud run {run_id} failed with status: {status}",
-                    metadata={"Run ID": run_id, "Status": status},
-                )
-            
-            time.sleep(15)  # Wait for 15 seconds before polling again
+                if status in ["Success", "Completed"]:
+                    context.log.info(f"dbt Cloud run {run_id} completed successfully.")
+                    break
+                elif status in ["Failed", "Cancelled", "Error"]:
+                    raise dg.Failure(
+                        description=f"dbt Cloud run {run_id} failed with status: {status}",
+                        metadata={"Run ID": run_id, "Status": status},
+                    )
+                
+                time.sleep(15)  # Wait for 15 seconds before polling again
 
-        except requests.exceptions.RequestException as e:
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
             context.log.error(f"Error polling for run status: {e}")
             time.sleep(30) # Wait longer on error
 
@@ -111,71 +120,18 @@ def trigger_dbt_cloud_run_manual(context: dg.OpExecutionContext) -> int:
 
 
 # ==============================================================================
-# 3. THE JOB (no resource dependencies)
+# 3. THE JOB
 # ==============================================================================
 @dg.job
 def dbt_cloud_trigger_job():
     trigger_dbt_cloud_run_manual()
 
 
-# # Diagnostic op to inspect the manually created workspace
-# @dg.op
-# def inspect_dbt_cloud_client(context: dg.OpExecutionContext):
-#     """
-#     A diagnostic op to inspect the client object returned by get_client().
-#     """
-#     # Get all required values directly from environment variables
-#     account_id = os.getenv("DBT_CLOUD_ACCOUNT_ID")
-#     access_url = os.getenv("DBT_CLOUD_ACCESS_URL")
-#     token = os.getenv("DBT_CLOUD_TOKEN")
-#     project_id = int(os.getenv("DBT_CLOUD_PROJECT_ID"))
-#     environment_id = int(os.getenv("DBT_CLOUD_ENVIRONMENT_ID"))
-
-#     creds = DbtCloudCredentials(
-#         account_id=account_id,
-#         access_url=access_url,
-#         token=token,
-#     )
-    
-#     # Create the workspace configuration object
-#     dbt_cloud_workspace = DbtCloudWorkspace(
-#         credentials=creds,
-#         project_id=project_id,
-#         environment_id=environment_id,
-#     )
-
-#     # Get the client object that will perform the actions
-#     client = dbt_cloud_workspace.get_client()
-    
-#     context.log.info(f"Type of client object: {type(client)}")
-    
-#     # Get all methods that don't start with an underscore
-#     methods = [method for method in dir(client) if not method.startswith('_')]
-    
-#     context.log.info("Methods on the Dbt Cloud client:")
-#     for method in sorted(methods):
-#         context.log.info(f"- {method}")
-
-# # Update the job to use the new op
-# @dg.job
-# def inspection_job():
-#     inspect_dbt_cloud_client()
-
 # ==============================================================================
-# 4. TOP-LEVEL DEFINITIONS (no resource definitions)
+# 4. TOP-LEVEL DEFINITIONS
 # ==============================================================================
-# defs = dg.Definitions(
-#     assets=dbt_cloud_assets,
-#     jobs=[dbt_cloud_trigger_job, inspection_job],
-#     sensors=[dbt_cloud_sensor],
-#     # No resources are defined here anymore.
-# )
-
-# The Definitions object must include BOTH jobs
 defs = dg.Definitions(
     assets=dbt_cloud_assets,
-    # jobs=[dbt_cloud_trigger_job, inspection_job],  # <-- Make sure inspection_job is here
-    jobs=[dbt_cloud_trigger_job],  # <-- Make sure inspection_job is here
+    jobs=[dbt_cloud_trigger_job],
     sensors=[dbt_cloud_sensor],
-    # No resources are defined here anymore.
 )
