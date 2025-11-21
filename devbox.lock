@@ -640,6 +640,70 @@
         }
       }
     },
+    "sqlfluff@latest": {
+      "last_modified": "2025-11-17T10:23:24Z",
+      "resolved": "github:NixOS/nixpkgs/8b6600824693a9c706ef09bd86711ca393703466#sqlfluff",
+      "source": "devbox-search",
+      "version": "3.5.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/8jpibsqdn5x7pa3b8v2ms9ckvg49nr5q-sqlfluff-3.5.0",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/rvzv9l787kc14c8jybrwb004zac1zg79-sqlfluff-3.5.0-dist"
+            }
+          ],
+          "store_path": "/nix/store/8jpibsqdn5x7pa3b8v2ms9ckvg49nr5q-sqlfluff-3.5.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/mv7v840z81mavd7gy8nvd3yssg54bww4-sqlfluff-3.5.0",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/z3x18z3ddrvp4gkykbn8w365gd2zkgmw-sqlfluff-3.5.0-dist"
+            }
+          ],
+          "store_path": "/nix/store/mv7v840z81mavd7gy8nvd3yssg54bww4-sqlfluff-3.5.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/gmbz6d419mb13pgc4g6s682i2iz77qss-sqlfluff-3.5.0",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/fyvzi4zv5wlhzm85idjq4pjlzw20b042-sqlfluff-3.5.0-dist"
+            }
+          ],
+          "store_path": "/nix/store/gmbz6d419mb13pgc4g6s682i2iz77qss-sqlfluff-3.5.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/g0jqhaw4h7avvf2gw4g8lwcmc9x9zdbb-sqlfluff-3.5.0",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/0yj0smlwi40md93xam6wk9j72ziww020-sqlfluff-3.5.0-dist"
+            }
+          ],
+          "store_path": "/nix/store/g0jqhaw4h7avvf2gw4g8lwcmc9x9zdbb-sqlfluff-3.5.0"
+        }
+      }
+    },
     "uv@latest": {
       "last_modified": "2025-10-22T20:59:19Z",
       "resolved": "github:NixOS/nixpkgs/01b6809f7f9d1183a2b3e081f0a1e6f8f415cb09#uv",
