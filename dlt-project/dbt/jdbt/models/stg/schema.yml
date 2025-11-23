@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: Staging model for raw_customers source
+    columns:
+      - name: customer_id
+        description: Unique identifier for the customer
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Customer's first name
+        tests:
+          - not_null
+      - name: last_name
+        description: Customer's last name
+        tests:
+          - not_null
+
+  - name: stg_orders
+    description: Staging model for raw_orders source
+    columns:
+      - name: order_id
+        description: Unique identifier for the order
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to stg_customers.customer_id
+        tests:
+          - not_null
+      - name: order_date
+        description: Date when the order was placed
+        tests:
+          - not_null
+      - name: status
+        description: Status of the order (placed, shipped, completed, return_pending, returned)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
+
+  - name: stg_payments
+    description: Staging model for raw_payments source
+    columns:
+      - name: payment_id
+        description: Unique identifier for the payment
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Foreign key to stg_orders.order_id
+        tests:
+          - not_null
+      - name: payment_method
+        description: Method used for payment
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['credit_card', 'coupon', 'bank_transfer', 'gift_card']
+      - name: amount
+        description: Payment amount in dollars
+        tests:
+          - not_null

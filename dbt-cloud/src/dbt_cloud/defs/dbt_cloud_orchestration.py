@@ -26,6 +26,7 @@ workspace = DbtCloudWorkspace(
 def my_dbt_cloud_assets(
     context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
 ):
+    context.log.info("Executing dbt Cloud build via CLI...")
     yield from dbt_cloud.cli(args=["build"], context=context).wait()
 
 
@@ -41,9 +42,13 @@ automation_sensor = dg.AutomationConditionSensorDefinition(
     name="automation_sensor",
     target="*",
     default_status=dg.DefaultSensorStatus.RUNNING,
-    minimum_interval_seconds=1,
+    minimum_interval_seconds=30,
 )
 
 # Build a sensor which will poll dbt Cloud for updates on runs/materialization history
 # and dbt Cloud Assets
 dbt_cloud_polling_sensor = build_dbt_cloud_polling_sensor(workspace=workspace)
+
+
+all_assets = [my_dbt_cloud_assets]
+all_sensors = [automation_sensor]

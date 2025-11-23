@@ -12,6 +12,8 @@ from dagster_dbt.cloud_v2.resources import (
 )
 from dagster_dbt.cloud_v2.sensor_builder import build_dbt_cloud_polling_sensor
 
+from .defs.dbt_cloud_orchestration import all_assets, all_sensors
+
 # ==============================================================================
 # 1. WORKSPACE FOR DEFINITIONS (runs at load time)
 # ==============================================================================
@@ -132,6 +134,9 @@ def dbt_cloud_trigger_job():
 # ==============================================================================
 defs = dg.Definitions(
     assets=dbt_cloud_assets,
+    sensors=all_sensors + [dbt_cloud_sensor],
     jobs=[dbt_cloud_trigger_job],
-    sensors=[dbt_cloud_sensor],
+    resources={
+        "dbt_cloud": workspace_for_defs
+    }
 )
