@@ -1,14 +1,12 @@
 [project]
-name = "dlt_project"
+name = "sling_project"
 requires-python = ">=3.9,<3.14"
 version = "0.1.0"
 dependencies = [
     "dagster==1.12.1",
     "dagster-dbt>=0.28.1",
-    "dagster-dlt>=0.28.1",
-    "dlt[duckdb]",
+    "dagster-sling>=0.28.1",
     "dbt-duckdb>=1.10.0",
-    "pandas>=2.3.3",
 ]
 
 [dependency-groups]
@@ -28,9 +26,9 @@ force-include = { "pyproject.toml" = "pyproject.toml" }
 directory_type = "project"
 
 [tool.dg.project]
-root_module = "dlt_project"
+root_module = "sling_project"
 registry_modules = [
-    "dlt_project.components.*",
+    "sling_project.components.*",
 ]
 
 

@@ -1,13 +1,12 @@
-type: dagster_sling.SlingReplicationCollectionComponent
+type: dagster_dlt.DltLoadCollectionComponent
 
 attributes:
-  sling:
-    connections:
-      - name: DUCKDB
-        type: duckdb
-        instance: /tmp/jaffle_platform.duckdb
-  replications:
-    - path: replication.yaml
+  loads:
+    - source: .loads.target_data
+      pipeline: .loads.pipeline
+      # Optional: add translation for customizing assets
       translation:
         group_name: ingestion
-        description: "Loads data from Sling replication {{ stream_definition.name }}"
+        key_prefix:
+          - target
+        description: "Loads target main data into DuckDB"
