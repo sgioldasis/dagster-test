@@ -5,7 +5,7 @@ attributes:
     connections:
       - name: DUCKDB
         type: duckdb
-        instance: /tmp/jaffle_platform.duckdb
+        instance: /tmp/sling_jaffle_platform.duckdb
   replications:
     - path: replication.yaml
       translation:
