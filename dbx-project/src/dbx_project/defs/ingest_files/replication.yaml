@@ -1,6 +1,7 @@
 # source: POSTGRES_CONN
-source: SQL_SERVER
+# source: SQL_SERVER
 # target: DUCKDB
+source: LOCAL
 target: DATABRICKS
 
 defaults:
@@ -8,12 +9,22 @@ defaults:
   object: "{stream_table}"
 
 streams:
-  # For POSTGRES - public.raw_customers:
-  dbo.raw_customers:
+  file://data/raw_customers.csv:
     object: "main.raw_customers"
-  # For POSTGRES - public.raw_orders:
-  dbo.raw_orders:
+    source_options:
+      empty_as_null: true
+  file://data/raw_orders.csv:
     object: "main.raw_orders"
-  # For POSTGRES - public.raw_payments:
-  dbo.raw_payments:
+  file://data/raw_payments.csv:
     object: "main.raw_payments"
+    
+# streams:
+#   # For POSTGRES - public.raw_customers:
+#   dbo.raw_customers:
+#     object: "main.raw_customers"
+#   # For POSTGRES - public.raw_orders:
+#   dbo.raw_orders:
+#     object: "main.raw_orders"
+#   # For POSTGRES - public.raw_payments:
+#   dbo.raw_payments:
+#     object: "main.raw_payments"
