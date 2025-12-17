@@ -8,6 +8,7 @@ dependencies = [
     "dagster-sling>=0.28.1",
     "dbt-databricks>=1.10.14",
     "dbt-duckdb>=1.10.0",
+    "sling[duckdb]>=1.4.0",
 ]
 
 [dependency-groups]

@@ -3,6 +3,11 @@ name: 'jdbt'
 version: '1.0.0'
 profile: 'jdbt'
 
+# Global tags for all models
+models:
+  jdbt:
+    +tags: ["databricks"]
+
 model-paths: ["models"]
 analysis-paths: ["analyses"]
 test-paths: ["tests"]

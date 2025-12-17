@@ -1,9 +1,5 @@
 jdbt:
   outputs:
-    local:
-      type: duckdb
-      path: "{{ env_var('LOCAL_DUCKDB_PATH') }}"
-      threads: 1
     prod:
       type: databricks
       catalog: test
@@ -13,6 +9,4 @@ jdbt:
       threads: 1
       token: "{{ env_var('DATABRICKS_TOKEN') }}"
       auth_type: databricks_cli
-      # auth_type: oauth
-
-  target: "{{ 'local' if env_var('DAGSTER_ENV') == 'LOCAL' else 'prod' }}"
+  target: prod

@@ -1,8 +1,20 @@
+# dbx_project/defs/ingest_files/defs.yaml
+
 type: dagster_sling.SlingReplicationCollectionComponent
 
 attributes:
+  sling:
+    connections:
+      - name: LOCAL_DUCKDB
+        type: duckdb
+        instance: "{{ env.LOCAL_DUCKDB_PATH }}"  # Uses your environment variable
+      - name: LOCAL
+        type: file
+  
   replications:
-    - path: replication.yaml
+    - 
+      path: "{{ 'replication_prod.yaml' if env.DAGSTER_ENV == 'PROD' else 'replication_local.yaml' }}"
       # translation:
-      #   group_name: sling_data
-      #   description: "Loads data from Sling replication {{ stream_definition.name }}"
+      #   group_name: "sling_replication"
+      #   tags:
+      #     environment: "test-tag"

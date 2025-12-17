@@ -1,0 +1,17 @@
+# PROD Environment Configuration - Databricks
+source: LOCAL
+target: DATABRICKS
+
+defaults:
+  mode: full-refresh
+  object: "{stream_table}"
+
+streams:
+  file://data/raw_customers.csv:
+    object: "main.raw_customers"
+    source_options:
+      empty_as_null: true
+  file://data/raw_orders.csv:
+    object: "main.raw_orders"
+  file://data/raw_payments.csv:
+    object: "main.raw_payments"

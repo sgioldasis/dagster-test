@@ -1,0 +1,7 @@
+type: dagster_dbt.DbtProjectComponent
+
+attributes:
+  project: '{{ project_root }}/dbt/jdbt'
+  profile: 'profiles_local.yml'
+  translation:
+    key: 'target/main/{{ node.name }}'
