@@ -1,6 +1,6 @@
 # PROD Environment Configuration - Databricks
 source: LOCAL
-target: DATABRICKS
+target: DATABRICKS_TEST
 
 defaults:
   mode: full-refresh

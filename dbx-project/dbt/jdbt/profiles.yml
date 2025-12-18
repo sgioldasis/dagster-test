@@ -7,7 +7,7 @@ jdbt:
     prod:
       type: databricks
       catalog: test
-      host: "dbc-a8f6bc8e-f728.cloud.databricks.com"
+      host: "{{ env_var('DATABRICKS_HOST') }}"
       http_path: "/sql/1.0/warehouses/333120755706219a"
       schema: main
       threads: 1

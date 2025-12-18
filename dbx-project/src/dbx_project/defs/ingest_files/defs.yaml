@@ -10,7 +10,14 @@ attributes:
         instance: "{{ env.LOCAL_DUCKDB_PATH }}"  # Uses your environment variable
       - name: LOCAL
         type: file
-  
+      - name: DATABRICKS_TEST
+        type: databricks
+        catalog: test
+        host: "{{ env.DATABRICKS_HOST }}"
+        schema: default
+        token: "{{ env.DATABRICKS_TOKEN }}"
+        warehouse_id: "{{ env.DATABRICKS_WAREHOUSE_ID }}"
+
   replications:
     - 
       path: "{{ 'replication_prod.yaml' if env.DAGSTER_ENV == 'PROD' else 'replication_local.yaml' }}"

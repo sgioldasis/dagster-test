@@ -810,7 +810,7 @@ requires-dist = [
     { name = "dagster-sling", specifier = ">=0.28.1" },
     { name = "dbt-databricks", specifier = ">=1.10.14" },
     { name = "dbt-duckdb", specifier = ">=1.10.0" },
-    { name = "sling", extras = ["duckdb"], specifier = ">=1.4.0" },
+    { name = "sling", specifier = "==1.5.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -2677,12 +2677,12 @@ wheels = [
 
 [[package]]
 name = "sling"
-version = "1.4.0"
+version = "1.5.1"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "sling-mac-arm64" },
+sdist = { url = "https://files.pythonhosted.org/packages/5d/a2/004be8b473689e99e11439710211cee0eebec6c469961a99fd39df71f579/sling-1.5.1.tar.gz", hash = "sha256:4639c4b7f21c4d99844c77d73015c72ae294fc54e9bcada4d550a6a8c7d71e80", size = 41095, upload-time = "2025-12-07T11:19:09.302Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/8e/66fafca08d2810428c2433e86c3db11bbf8896ee3c8814a54a8ebb8b1760/sling-1.5.1-py3-none-any.whl", hash = "sha256:101dfac15bd4de0f5265f53653087f02a69321010fd1141f3e532cd1cd2b7049", size = 24893, upload-time = "2025-12-07T11:19:07.774Z" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/92/f6/d066eab6ddf70c63e9279d6a5fe75d76fa64f0a1d5c6bb6aac1096557875/sling-1.4.0.tar.gz", hash = "sha256:b784bc18e4c43592bf4af2b22ed37d30a8d22a9357032b22078f731e66f72ca6", size = 6945, upload-time = "2025-01-22T21:37:46.314Z" }
 
 [[package]]
 name = "sling-mac-arm64"
