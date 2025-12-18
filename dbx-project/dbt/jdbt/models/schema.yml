@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: customers
+    description: Final customers model aggregated with order and payment metrics
+    columns:
+      - name: customer_id
+        description: Primary key for customer
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: first_name
+        description: Customer first name
+        tests:
+          - not_null
+      - name: last_name
+        description: Customer last name
+        tests:
+          - not_null
+      - name: first_order
+        description: Date of first order (NULL if no orders)
+      - name: most_recent_order
+        description: Date of most recent order (NULL if no orders)
+      - name: number_of_orders
+        description: Total number of orders placed by customer
+      - name: customer_lifetime_value
+        description: Total value of all payments for customer
+
+  - name: orders
+    description: Final orders model with payment method breakdowns
+    columns:
+      - name: order_id
+        description: Primary key for order
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to customer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_date
+        description: Date order was placed
+        tests:
+          - not_null
+      - name: status
+        description: Current status of the order
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
+      - name: credit_card_amount
+        description: Amount paid by credit card
+      - name: coupon_amount
+        description: Amount paid by coupon
+      - name: bank_transfer_amount
+        description: Amount paid by bank transfer
+      - name: gift_card_amount
+        description: Amount paid by gift card
+      - name: amount
+        description: Total order amount
