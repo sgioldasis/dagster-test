@@ -1,9 +1,12 @@
 import os
-from dagster import asset, AssetExecutionContext, Definitions
+from dagster import asset, AssetExecutionContext, Definitions, AssetKey
 from dagster_databricks import PipesDatabricksClient
 from databricks.sdk.service import jobs
 
-@asset(deps=["customers"])
+@asset(
+    deps=[AssetKey(["target", "main", "customers"])],
+    group_name="post_processing"
+)
 def databricks_notebook_job(context: AssetExecutionContext, pipes_databricks: PipesDatabricksClient):
     notebook_path = os.environ.get("DATABRICKS_NOTEBOOK_PATH", "/Users/your.email@databricks.com/dagster_test_notebook")
     cluster_id = os.environ.get("DATABRICKS_CLUSTER_ID")

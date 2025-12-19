@@ -4,3 +4,4 @@ attributes:
   project: '{{ project_root }}/dbt/jdbt'
   translation:
     key: 'target/main/{{ node.name }}'
+

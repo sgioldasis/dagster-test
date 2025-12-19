@@ -7,6 +7,9 @@ profile: 'jdbt'
 models:
   jdbt:
     +tags: ["databricks"]
+    +meta:
+      dagster:
+        group: "Transformation"
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
