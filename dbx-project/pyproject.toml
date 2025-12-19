@@ -4,6 +4,7 @@ requires-python = ">=3.10,<3.14"
 version = "0.1.0"
 dependencies = [
     "dagster>=1.12.1",
+    "dagster-databricks",
     "dagster-dbt>=0.28.1",
     "dagster-sling>=0.28.1",
     "dbt-databricks>=1.10.14",
@@ -26,6 +27,9 @@ force-include = { "pyproject.toml" = "pyproject.toml" }
 
 [tool.dg]
 directory_type = "project"
+
+[tool.dg.cli]
+suppress_warnings = ["project_and_activated_venv_mismatch"]
 
 [tool.dg.project]
 root_module = "dbx_project"

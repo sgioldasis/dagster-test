@@ -19,9 +19,10 @@ attributes:
         warehouse_id: "{{ env.DATABRICKS_WAREHOUSE_ID }}"
 
   replications:
-    - 
+    -
       path: "{{ 'replication_prod.yaml' if env.DAGSTER_ENV == 'PROD' else 'replication_local.yaml' }}"
-      # translation:
-      #   group_name: "sling_replication"
-      #   tags:
-      #     environment: "test-tag"
+      translation:
+        group_name: "sling_replication"
+        description: "Loads data from Sling replication {{ stream_definition.name }}"
+        tags:
+          environment: "{{ env.DAGSTER_ENV }}"

@@ -1,16 +1,17 @@
 # PROD Environment Configuration - Databricks
-source: POSTGRES_CONN
+source: LOCAL
 target: DATABRICKS_TEST
 
 defaults:
   mode: full-refresh
   object: "{stream_table}"
-  replication_key: updated_at
 
 streams:
-  public.raw_customers:
+  file://data/raw_customers.csv:
     object: "main.raw_customers"
-  public.raw_orders:
+    source_options:
+      empty_as_null: true
+  file://data/raw_orders.csv:
     object: "main.raw_orders"
-  public.raw_payments:
+  file://data/raw_payments.csv:
     object: "main.raw_payments"
