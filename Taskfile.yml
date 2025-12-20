@@ -15,8 +15,8 @@ tasks:
       - sh: 'test -n "{{.CLI_ARGS}}"'
         msg: "Error: <folder> argument is required. Example: task project -- dbx-project"
 
-  dg-run:
-    desc: "Run Dagster dev server. Usage: task dg-run -- <folder>"
+  dg-dev:
+    desc: "Run Dagster dev server. Usage: task dg-dev -- <folder>"
     cmds:
       - task: project
         vars: {CLI_ARGS: '{{.CLI_ARGS}}'}
@@ -24,7 +24,7 @@ tasks:
     dir: "{{.CLI_ARGS}}"
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Error: <folder> argument is required. Example: task dg-run -- dbx-project"
+        msg: "Error: <folder> argument is required. Example: task dg-dev -- dbx-project"
 
   pg-prepare:
     desc: "Setup PostgreSQL and load data"

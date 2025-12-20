@@ -1,3 +1,14 @@
+{{ config(
+    meta={
+        "dagster": {
+            "group": "Transformation",
+            "legacy_freshness_policy": {
+                "maximum_lag_minutes": 2
+            }
+        }
+    }
+) }}
+
 with customers as (
 
     select * from {{ ref('stg_customers') }}
