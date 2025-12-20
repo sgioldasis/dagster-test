@@ -1,0 +1,18 @@
+-- DuckDB UI / CLI Settings
+SET display_mode='box';
+SET max_width=200;
+SET null_value='NULL';
+
+-- Extension Settings
+SET autoinstall_known_extensions=true;
+SET autoload_known_extensions=true;
+
+-- Load common extensions
+LOAD httpfs;
+LOAD icu;
+INSTALL ui;
+LOAD ui;
+
+-- Metadata and Progress
+SET enable_progress_bar=true;
+SET preserve_insertion_order=false;

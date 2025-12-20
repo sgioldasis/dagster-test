@@ -12,7 +12,8 @@
     "postgresql@latest",
     "sqlcmd@latest",
     "bat@latest",
-    "sqlfluff@latest"
+    "sqlfluff@latest",
+    "go-task@latest"
   ],
   "shell": {
     "init_hook": [
@@ -26,7 +27,8 @@
       "# Silent dbt Fusion installation",
       "if ! command -v dbtf &> /dev/null; then",
       "  curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update > /dev/null 2>&1 && echo 'dbt Fusion installed' || echo 'dbt Fusion install failed'",
-      "fi"
+      "fi",
+      "alias ac=task"
     ]
   }
 }

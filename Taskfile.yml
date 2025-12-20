@@ -1,0 +1,48 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  project:
+    desc: "Sync project environment. Usage: task project -- <folder>"
+    dir: "{{.CLI_ARGS}}"
+    cmds:
+      - uv sync
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Error: <folder> argument is required. Example: task project -- dbx-project"
+
+  dg-run:
+    desc: "Run Dagster dev server. Usage: task dg-run -- <folder>"
+    cmds:
+      - task: project
+        vars: {CLI_ARGS: '{{.CLI_ARGS}}'}
+      - dg dev
+    dir: "{{.CLI_ARGS}}"
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Error: <folder> argument is required. Example: task dg-run -- dbx-project"
+
+  pg-prepare:
+    desc: "Setup PostgreSQL and load data"
+    dir: "sling-project"
+    cmds:
+      - createdb jaffle_shop || true
+      - sling conns set POSTGRES_CONN url="postgresql://localhost:5432/jaffle_shop?sslmode=disable"
+      - sling run --src-conn "file://data/raw_customers.csv" --tgt-conn POSTGRES_CONN --tgt-object public.raw_customers
+      - sling run --src-conn "file://data/raw_orders.csv" --tgt-conn POSTGRES_CONN --tgt-object public.raw_orders
+      - sling run --src-conn "file://data/raw_payments.csv" --tgt-conn POSTGRES_CONN --tgt-object public.raw_payments
+
+  pg-cli:
+    desc: "Open PostgreSQL CLI for jaffle_shop"
+    cmds:
+      - psql -h localhost -d jaffle_shop
+
+  ddb-ui:
+    desc: "Start DuckDB UI in dbx-project"
+    dir: "dbx-project"
+    cmds:
+      - duckdb /tmp/jaffle_platform.duckdb -cmd "INSTALL ui; LOAD ui;" -ui
