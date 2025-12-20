@@ -429,6 +429,21 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-databricks"
+version = "0.28.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+    { name = "dagster-pipes" },
+    { name = "dagster-pyspark" },
+    { name = "databricks-sdk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b9/6b/404c9ef475df103c2493092a3992a3e4927d8db0f039ea1873afb8c09c44/dagster_databricks-0.28.6.tar.gz", hash = "sha256:e3fe281e7e2f563c93d845026b734b82221507efebf21d9630ebbae27b1d72cb", size = 50966, upload-time = "2025-12-11T20:31:17.31Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/17/a17e00fc9afa4cbbb560544b04b867fc50046c381a0b469796f4fd02cbdd/dagster_databricks-0.28.6-py3-none-any.whl", hash = "sha256:baad3ae6ab617ade16b6394e76171115514ef678e931342fcbb175c1ced753ba", size = 57083, upload-time = "2025-12-11T20:31:16.093Z" },
+]
+
+[[package]]
 name = "dagster-dbt"
 version = "0.28.6"
 source = { registry = "https://pypi.org/simple" }
@@ -521,6 +536,20 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-pyspark"
+version = "0.28.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+    { name = "dagster-spark" },
+    { name = "pyspark" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/47/eb5edd8a6dd2d7becd58c9aa0717940f271b02b712fecc28c84a24515a46/dagster_pyspark-0.28.6.tar.gz", hash = "sha256:d2830e82fe4a64667ea4923339755c6797090960a82ab28494c8637e0c548d9a", size = 12152, upload-time = "2025-12-11T20:32:01.832Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/92/94/497022d7a92e99740f0819cbd40348880389b05249bbe662ae13e813802b/dagster_pyspark-0.28.6-py3-none-any.whl", hash = "sha256:9638e2c14fc85cadf8c87e15de70f467933f0446fcaa447a8c99fc17b43962ae", size = 12562, upload-time = "2025-12-11T20:31:59.949Z" },
+]
+
+[[package]]
 name = "dagster-shared"
 version = "1.12.6"
 source = { registry = "https://pypi.org/simple" }
@@ -552,6 +581,18 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-spark"
+version = "0.28.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/86/250312453d38ad826f6de287a5cca414610f22c4e709f8a7f77c57626b6c/dagster_spark-0.28.6.tar.gz", hash = "sha256:c8649d5413ef94314d218c01ed99e3c73b9c702f2c2a6b3007debbc43af8f535", size = 38276, upload-time = "2025-12-11T20:29:49.593Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/d2/1da4c3bdaa9cbed43c5cf59606c07dbdf8cc42711ff04ad31f46fb245e66/dagster_spark-0.28.6-py3-none-any.whl", hash = "sha256:1bb87d01c77c00864e02b144f326e03ce5f06f8c7506288a213b6ea349a282eb", size = 40039, upload-time = "2025-12-11T20:29:47.594Z" },
+]
+
+[[package]]
 name = "dagster-webserver"
 version = "1.12.6"
 source = { registry = "https://pypi.org/simple" }
@@ -569,15 +610,15 @@ wheels = [
 
 [[package]]
 name = "databricks-sdk"
-version = "0.63.0"
+version = "0.60.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-auth" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/af/f77be9ed096e7e83732e80d87997256d7bd7d9aff62fa0d51e4068ae786c/databricks_sdk-0.63.0.tar.gz", hash = "sha256:f141bc810b4145e93e628a0e159ea41806440aed0cd17adddd252d65d1968465", size = 732112, upload-time = "2025-08-13T09:00:08.722Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/42/2b153d0eddd7626e1646208fa6aa6f96c192b7cda1e5a2179c728aaa2a46/databricks_sdk-0.60.0.tar.gz", hash = "sha256:14358fb160d19477e8666bd5403ca1bbb7f307f217a77b77a845c75905ffc0a1", size = 720339, upload-time = "2025-07-24T10:15:57.896Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/fd/2bb9bdf083a6943630762108e3e4e24b83f0571dd39cfa4fd467adaa1921/databricks_sdk-0.63.0-py3-none-any.whl", hash = "sha256:3ea569dcd0a4395c17221a5da39db4da85c6fc91b5fc14546514e329451d5eb3", size = 688018, upload-time = "2025-08-13T09:00:07.071Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/fb/4f29b68101dd04fe5278c9f8e4e8944580f4b2b40554748eaa0cfdd42c59/databricks_sdk-0.60.0-py3-none-any.whl", hash = "sha256:a6983569e4a3a9ad322a3682e187b6d9830a7c5be6224203cfa2b67ed8e9d8a6", size = 677049, upload-time = "2025-07-24T10:15:56.133Z" },
 ]
 
 [[package]]
@@ -790,6 +831,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dagster" },
+    { name = "dagster-databricks" },
     { name = "dagster-dbt" },
     { name = "dagster-sling" },
     { name = "dbt-databricks" },
@@ -806,6 +848,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dagster", specifier = ">=1.12.1" },
+    { name = "dagster-databricks" },
     { name = "dagster-dbt", specifier = ">=0.28.1" },
     { name = "dagster-sling", specifier = ">=0.28.1" },
     { name = "dbt-databricks", specifier = ">=1.10.14" },
@@ -2130,6 +2173,15 @@ wheels = [
 ]
 
 [[package]]
+name = "py4j"
+version = "0.10.9.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/31/0b210511177070c8d5d3059556194352e5753602fa64b85b7ab81ec1a009/py4j-0.10.9.9.tar.gz", hash = "sha256:f694cad19efa5bd1dee4f3e5270eb406613c974394035e5bfc4ec1aba870b879", size = 761089, upload-time = "2025-01-15T03:53:18.624Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/db/ea0203e495be491c85af87b66e37acfd3bf756fd985f87e46fc5e3bf022c/py4j-0.10.9.9-py2.py3-none-any.whl", hash = "sha256:c7c26e4158defb37b0bb124933163641a2ff6e3a3913f7811b0ddbe07ed61533", size = 203008, upload-time = "2025-01-15T03:53:15.648Z" },
+]
+
+[[package]]
 name = "pyarrow"
 version = "22.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2338,6 +2390,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/0f/49/4cea918a08f02817a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/dc/491b7661614ab97483abf2056be1deee4dc2490ecbf7bff9ab5cdbac86e1/pyreadline3-3.5.4-py3-none-any.whl", hash = "sha256:eaf8e6cc3c49bcccf145fc6067ba8643d1df34d604a1ec0eccbf7a18e6d3fae6", size = 83178, upload-time = "2024-09-19T02:40:08.598Z" },
 ]
+
+[[package]]
+name = "pyspark"
+version = "4.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "py4j" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/88/0d/f280cbd070e424008f370c068c6a371e0cbb902e33d9709b01e97d479b01/pyspark-4.1.0.tar.gz", hash = "sha256:09c714ada88dfac3e1213c066617c6f473c1e22fbe279855028f77e12434147d", size = 455337789, upload-time = "2025-12-16T12:30:47.141Z" }
 
 [[package]]
 name = "python-dateutil"

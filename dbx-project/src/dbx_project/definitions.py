@@ -1,7 +1,7 @@
 # src/dbx_project/definitions.py
 
 from pathlib import Path
-from dagster import load_from_defs_folder, Definitions
+from dagster import load_from_defs_folder, Definitions, multiprocess_executor
 from dagster_databricks import PipesDatabricksClient
 from databricks.sdk import WorkspaceClient
 from dotenv import load_dotenv
@@ -38,6 +38,7 @@ defs = Definitions.merge(
         path_within_project=Path(__file__).parent / 'defs'
     ),
     Definitions(
+        executor=multiprocess_executor.configured({"max_concurrent": 4}),
         resources={
             "pipes_databricks": CustomPipesDatabricksClient(
                 client=workspace_client,

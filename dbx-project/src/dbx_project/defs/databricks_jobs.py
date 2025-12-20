@@ -5,7 +5,8 @@ from databricks.sdk.service import jobs
 
 @asset(
     deps=[AssetKey(["target", "main", "customers"])],
-    group_name="post_processing"
+    group_name="post_processing",
+    compute_kind="databricks"
 )
 def databricks_notebook_job(context: AssetExecutionContext, pipes_databricks: PipesDatabricksClient):
     notebook_path = os.environ.get("DATABRICKS_NOTEBOOK_PATH", "/Users/your.email@databricks.com/dagster_test_notebook")
@@ -42,6 +43,9 @@ def databricks_notebook_job(context: AssetExecutionContext, pipes_databricks: Pi
         }
     ).get_materialize_result()
 
-defs = Definitions(
-    assets=[databricks_notebook_job]
-)
+if os.environ.get("DAGSTER_ENV") == "LOCAL":
+    defs = Definitions()
+else:
+    defs = Definitions(
+        assets=[databricks_notebook_job]
+    )
