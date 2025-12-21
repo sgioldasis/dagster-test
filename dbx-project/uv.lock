@@ -836,7 +836,6 @@ dependencies = [
     { name = "dagster-sling" },
     { name = "dbt-databricks" },
     { name = "dbt-duckdb" },
-    { name = "pytest" },
     { name = "sling" },
 ]
 
@@ -844,6 +843,7 @@ dependencies = [
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -854,7 +854,6 @@ requires-dist = [
     { name = "dagster-sling", specifier = ">=0.28.1" },
     { name = "dbt-databricks", specifier = ">=1.10.14" },
     { name = "dbt-duckdb", specifier = ">=1.10.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
     { name = "sling", specifier = "==1.5.1" },
 ]
 
@@ -862,6 +861,7 @@ requires-dist = [
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest", specifier = ">=9.0.2" },
 ]
 
 [[package]]

@@ -9,7 +9,6 @@ dependencies = [
     "dagster-sling>=0.28.1",
     "dbt-databricks>=1.10.14",
     "dbt-duckdb>=1.10.0",
-    "pytest>=9.0.2",
     "sling==1.5.1",
 ]
 
@@ -17,6 +16,7 @@ dependencies = [
 dev = [
     "dagster-webserver",
     "dagster-dg-cli",
+    "pytest>=9.0.2",
 ]
 
 [build-system]
