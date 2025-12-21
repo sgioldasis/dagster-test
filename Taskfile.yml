@@ -46,3 +46,12 @@ tasks:
     dir: "dbx-project"
     cmds:
       - duckdb /tmp/jaffle_platform.duckdb -cmd "INSTALL ui; LOAD ui;" -ui
+
+  dg-test:
+    desc: "Run pytest in a project. Usage: task test -- <folder>"
+    dir: "{{.CLI_ARGS}}"
+    cmds:
+      - uv run pytest -v
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Error: <folder> argument is required. Example: task test -- dbx-project"
