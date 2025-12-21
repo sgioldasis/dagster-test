@@ -72,13 +72,18 @@ def get_definitions() -> Definitions:
         )
     )
 
-    # Enrich the customers asset with a LegacyFreshnessPolicy to show the "Expected: 2m" label in UI
+    # Enrich assets with LegacyFreshnessPolicy to show the "Expected: 2m" label in UI
     def enrich_asset(asset_def):
-        customers_key = AssetKey(["target", "main", "customers"])
-        # Check if this asset definition contains our target key
-        if hasattr(asset_def, "keys") and customers_key in asset_def.keys:
+        # Define keys for assets that should have freshness policies
+        assets_with_freshness = [
+            AssetKey(["target", "main", "raw_customers"]),
+            AssetKey(["target", "main", "stg_customers"]),
+            AssetKey(["target", "main", "customers"])
+        ]
+        # Check if this asset definition contains any of our target keys
+        if hasattr(asset_def, "keys"):
             def transform_spec(spec):
-                if spec.key == customers_key:
+                if spec.key in assets_with_freshness:
                     return AssetSpec(
                         key=spec.key,
                         deps=spec.deps,
