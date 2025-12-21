@@ -10,7 +10,7 @@ defaults:
 streams:
   public.raw_customers:
     object: "main.raw_customers"
-  public.raw_orders:
-    object: "main.raw_orders"
-  public.raw_payments:
-    object: "main.raw_payments"
+  # public.raw_orders:
+  #   object: "main.raw_orders"
+  # public.raw_payments:
+  #   object: "main.raw_payments"

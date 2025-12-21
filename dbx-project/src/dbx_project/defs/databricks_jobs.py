@@ -1,12 +1,13 @@
 import os
-from dagster import asset, AssetExecutionContext, Definitions, AssetKey
+from dagster import asset, AssetExecutionContext, Definitions, AssetKey, LegacyFreshnessPolicy
 from dagster_databricks import PipesDatabricksClient
 from databricks.sdk.service import jobs
 
 @asset(
     deps=[AssetKey(["target", "main", "customers"])],
     group_name="post_processing",
-    compute_kind="databricks"
+    compute_kind="databricks",
+    legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=2)
 )
 def databricks_notebook_job(context: AssetExecutionContext, pipes_databricks: PipesDatabricksClient):
     notebook_path = os.environ.get("DATABRICKS_NOTEBOOK_PATH", "/Users/your.email@databricks.com/dagster_test_notebook")
