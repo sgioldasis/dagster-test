@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from dagster import load_from_defs_folder, Definitions, multiprocess_executor, LegacyFreshnessPolicy, AssetKey, AssetSpec
+from .defs.ingest_files.partitioned_ingestion import raw_orders, raw_payments
 from dagster_databricks import PipesDatabricksClient
 from databricks.sdk import WorkspaceClient
 from dotenv import load_dotenv
@@ -11,16 +12,33 @@ from .custom_pipes import CustomPipesDatabricksClient
 # You still need this to make the env var available to the component
 load_dotenv()
 
-# Configure Pipes Client
-workspace_client = WorkspaceClient(
-    host=os.environ.get("DATABRICKS_HOST"),
-    token=os.environ.get("DATABRICKS_TOKEN"),
-)
+# Configure Pipes Client lazily and defensively: don't raise during import if
+# Databricks auth is not configured in the environment.
+workspace_client = None
+databricks_host = os.environ.get("DATABRICKS_HOST")
+databricks_token = os.environ.get("DATABRICKS_TOKEN")
 
 client_kwargs = {}
 volume_path = os.environ.get("DATABRICKS_VOLUME_PATH")
 
-if volume_path:
+if databricks_host and databricks_token:
+    try:
+        workspace_client = WorkspaceClient(host=databricks_host, token=databricks_token)
+    except Exception as e:
+        # Avoid failing imports when credentials/environment are not available.
+        # Use logging so this is visible in environments where imports occur.
+        try:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Could not initialize Databricks WorkspaceClient (%s); Databricks integrations disabled.", e
+            )
+        except Exception:
+            # Best-effort: if logging is unavailable, fall back to print.
+            print("Warning: could not initialize Databricks WorkspaceClient:", e)
+        workspace_client = None
+
+if volume_path and workspace_client:
     # Use Unity Catalog Volumes (required for permission restrictions or serverless)
     from dagster_databricks.pipes import (
         PipesUnityCatalogVolumesContextInjector,
@@ -34,12 +52,17 @@ if volume_path:
     )
 
 def get_definitions() -> Definitions:
+    # Load assets from YAML definitions
+    yaml_defs = load_from_defs_folder(
+        path_within_project=Path(__file__).parent / 'defs'
+    )
+    
+    # Create definitions with partitioned ingestion assets explicitly included
     merged_defs = Definitions.merge(
-        load_from_defs_folder(
-            path_within_project=Path(__file__).parent / 'defs'
-        ),
+        yaml_defs,
         Definitions(
-            executor=multiprocess_executor.configured({"max_concurrent": 4}),
+            assets=[raw_orders, raw_payments],
+            executor=multiprocess_executor.configured({"max_concurrent": 1}),
             resources={
                 "pipes_databricks": CustomPipesDatabricksClient(
                     client=workspace_client,

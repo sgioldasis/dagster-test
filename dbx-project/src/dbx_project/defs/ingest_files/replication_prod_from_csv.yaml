@@ -11,7 +11,7 @@ streams:
     object: "main.raw_customers"
     source_options:
       empty_as_null: true
-  file://data/raw_orders.csv:
-    object: "main.raw_orders"
-  file://data/raw_payments.csv:
-    object: "main.raw_payments"
+  # file://data/raw_orders.csv:
+  #   object: "main.raw_orders"
+  # file://data/raw_payments.csv:
+  #   object: "main.raw_payments"

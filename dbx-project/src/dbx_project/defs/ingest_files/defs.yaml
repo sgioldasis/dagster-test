@@ -22,7 +22,7 @@ attributes:
     -
       path: "{{ 'replication_prod.yaml' if env.DAGSTER_ENV == 'PROD' else 'replication_local.yaml' }}"
       translation:
-        group_name: "sling_replication"
+        group_name: "ingestion_full"
         description: "Loads data from Sling replication {{ stream_definition.name }}"
         tags:
           environment: "{{ env.DAGSTER_ENV }}"
