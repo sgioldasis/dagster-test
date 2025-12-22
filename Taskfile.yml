@@ -41,7 +41,7 @@ tasks:
     cmds:
       - psql -h localhost -d jaffle_shop
 
-  ddb-ui:
+  ddb:
     desc: "Start DuckDB UI in dbx-project"
     dir: "dbx-project"
     cmds:
