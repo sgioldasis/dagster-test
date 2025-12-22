@@ -6,7 +6,7 @@ tasks:
       - task --list
     silent: true
 
-  project:
+  sync:
     desc: "Sync project environment. Usage: task project -- <folder>"
     dir: "{{.CLI_ARGS}}"
     cmds:
@@ -18,7 +18,7 @@ tasks:
   dg-dev:
     desc: "Run Dagster dev server. Usage: task dg-dev -- <folder>"
     cmds:
-      - task: project
+      - task: sync
         vars: {CLI_ARGS: '{{.CLI_ARGS}}'}
       - dg dev
     dir: "{{.CLI_ARGS}}"
@@ -47,7 +47,7 @@ tasks:
     cmds:
       - duckdb /tmp/jaffle_platform.duckdb -cmd "INSTALL ui; LOAD ui;" -ui
 
-  dg-test:
+  test:
     desc: "Run pytest in a project. Usage: task test -- <folder>"
     dir: "{{.CLI_ARGS}}"
     cmds:

@@ -1,8 +1,8 @@
 {
   "env": {
-    "UV_PYTHON": "$PWD/.venv/bin/python",
+    "UV_PYTHON":               "$PWD/.venv/bin/python",
     "DEVBOX_COREPACK_ENABLED": "1",
-    "PGHOST": "localhost"
+    "PGHOST":                  "localhost"
   },
   "packages": [
     "python@3.13",
@@ -13,13 +13,18 @@
     "sqlcmd@latest",
     "bat@latest",
     "sqlfluff@latest",
-    "go-task@latest"
+    "go-task@latest",
+    "figlet@latest",
+    "lolcat@latest",
   ],
   "shell": {
     "init_hook": [
       "unset DEBUGINFOD_URLS",
       ". $VENV_DIR/bin/activate > /dev/null 2>&1",
       "uv pip install -r requirements.txt > /dev/null 2>&1",
+      "# --- Intro ---",
+      "figlet Kaizen Dev | lolcat -f",
+      "echo \"Type 'kc' to see a list of available tasks\"",
       "# --- PostgreSQL (one-time init + background start) ---",
       "mkdir -p .devbox/var/log",
       "if [ ! -d .devbox/var/lib/postgres/base ]; then initdb -D .devbox/var/lib/postgres; fi",
@@ -28,7 +33,7 @@
       "if ! command -v dbtf &> /dev/null; then",
       "  curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update > /dev/null 2>&1 && echo 'dbt Fusion installed' || echo 'dbt Fusion install failed'",
       "fi",
-      "alias ac=task"
+      "alias kc=task"
     ]
   }
 }
