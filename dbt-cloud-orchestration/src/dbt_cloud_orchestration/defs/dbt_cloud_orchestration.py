@@ -28,18 +28,58 @@ workspace = DbtCloudWorkspace(
 )
 
 # Builds your asset graph
+# Builds your asset graph
+# Builds your asset graph
+# Builds your asset graph
+# Builds your asset graph
 @dbt_cloud_assets(workspace=workspace)
 def my_dbt_cloud_assets(
     context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
 ):
-    yield from dbt_cloud.cli(args=["build"], context=context).wait()
+    yield from dbt_cloud.cli(args=["build"], context=context).wait(timeout=600)
 
-# Automate your assets
-my_dbt_cloud_assets = my_dbt_cloud_assets.map_asset_specs(
-    lambda spec: spec.replace_attributes(
-        automation_condition=dg.AutomationCondition.eager()
+# Conditional Logic: Check if stg_kaizen_wars__fact_virtual is discovered
+discovered_asset_keys = {k.path[-1] for k in my_dbt_cloud_assets.keys}
+target_key = "stg_kaizen_wars__fact_virtual"
+is_discovered = target_key in discovered_asset_keys
+
+kaizen_wars_assets = []
+
+if is_discovered:
+    # Case A: Asset exists. Map it to add deps/automation.
+    def map_dbt_specs(spec: dg.AssetSpec) -> dg.AssetSpec:
+        # Default automation for all
+        spec = spec.replace_attributes(automation_condition=dg.AutomationCondition.any_deps_updated())
+        
+        if spec.key.path[-1] == target_key:
+            return spec.replace_attributes(
+                deps=[*spec.deps, dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])],
+                automation_condition=dg.AutomationCondition.any_deps_updated()
+            )
+        return spec
+    
+    my_dbt_cloud_assets = my_dbt_cloud_assets.map_asset_specs(map_dbt_specs)
+
+else:
+    # Case B: Asset missing. Define explicitly AND map defaults for others.
+    my_dbt_cloud_assets = my_dbt_cloud_assets.map_asset_specs(
+        lambda spec: spec.replace_attributes(automation_condition=dg.AutomationCondition.any_deps_updated())
     )
-)
+    
+    @asset(
+        key=[target_key],
+        deps=[dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])],
+        automation_condition=dg.AutomationCondition.any_deps_updated(),
+        compute_kind="dbt",
+        group_name="kaizen_wars"
+    )
+    def stg_kaizen_wars__fact_virtual(context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace):
+        """
+        Formally managed dbt asset for Kaizen Wars fact_virtual (Explicit Definition).
+        """
+        yield from dbt_cloud.cli(args=["build", "--select", target_key], context=context).wait(timeout=600)
+        
+    kaizen_wars_assets = [stg_kaizen_wars__fact_virtual]
 
 # Create an op that triggers a specific dbt Cloud job via API
 @op
@@ -88,9 +128,9 @@ def dbt_cloud_job_trigger():
 
 
 @asset(
-    deps=["stg_kaizen_wars__fact_virtual"],
+    deps=[dg.AssetKey("stg_kaizen_wars__fact_virtual")],
     description="Asset that counts records in stg_kaizen_wars__fact_virtual and writes to file",
-    automation_condition=dg.AutomationCondition.eager()
+    automation_condition=dg.AutomationCondition.any_deps_updated()
 )
 def fact_virtual_count_asset(context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace):
     """
@@ -183,5 +223,6 @@ __all__ = [
     "dbt_cloud_polling_sensor",
     "workspace",
     "dbt_cloud_job_trigger",
-    "fact_virtual_count_asset",
+    "fact_virtual_count_asset", 
+    "kaizen_wars_assets",
 ]
