@@ -4,7 +4,7 @@ import os
 import dlt
 import pandas as pd
 import dagster as dg
-from dagster import asset, Definitions
+from dagster import asset, Definitions, ScheduleDefinition
 from dagster_dlt import dlt_assets, DagsterDltResource
 
 # Configure DLT pipeline for Databricks
@@ -141,6 +141,13 @@ dlt_databricks_assets = dlt_databricks_assets.map_asset_specs(
 )
 kaizen_wars_ingest_assets = kaizen_wars_ingest_assets.map_asset_specs(
     lambda spec: spec.replace_attributes(automation_condition=dg.AutomationCondition.eager())
+)
+
+# Schedule for Kaizen Wars DLT ingestion (Every 5 minutes)
+kaizen_wars_dlt_schedule = ScheduleDefinition(
+    name="kaizen_wars_dlt_schedule",
+    target=dg.AssetSelection.keys("dlt_kaizen_wars_fact_virtual"),
+    cron_schedule="*/5 * * * *",
 )
 
 def get_dlt_definitions():

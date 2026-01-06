@@ -12,6 +12,7 @@ from dbt_cloud_orchestration.defs.dbt_cloud_orchestration import (
 from dbt_cloud_orchestration.defs.dlt_databricks_ingest.dlt_pipeline import (
     dlt_databricks_assets,
     kaizen_wars_ingest_assets,
+    kaizen_wars_dlt_schedule,
 )
 from dagster_dlt import DagsterDltResource
 from dagster import AutomationConditionSensorDefinition
@@ -32,6 +33,7 @@ defs = dg.Definitions(
         kaizen_wars_ingest_assets,
     ],
     sensors=[dbt_cloud_polling_sensor, automation_sensor],
+    schedules=[kaizen_wars_dlt_schedule],
     jobs=[dbt_cloud_job_trigger],
     resources={
         "dbt_cloud": workspace,
