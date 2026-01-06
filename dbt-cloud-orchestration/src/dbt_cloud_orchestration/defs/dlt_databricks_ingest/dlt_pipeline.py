@@ -6,6 +6,8 @@ import pandas as pd
 import dagster as dg
 from dagster import asset, Definitions, ScheduleDefinition
 from dagster_dlt import dlt_assets, DagsterDltResource
+import shutil
+import uuid
 
 # Configure DLT pipeline for Databricks
 def configure_dlt_pipeline():
@@ -25,9 +27,12 @@ def configure_dlt_pipeline():
     if not http_path and warehouse_id:
         http_path = f"/sql/1.0/warehouses/{warehouse_id}"
     
-    # Configure DLT pipeline
+    # Generate a unique pipeline name to avoid storage conflicts
+    pipeline_name = f"databricks_ingestion_{uuid.uuid4().hex[:8]}"
+    
+    # Configure DLT pipeline with dev_mode=True to avoid persistent storage issues
     pipeline = dlt.pipeline(
-        pipeline_name="databricks_ingestion",
+        pipeline_name=pipeline_name,
         destination=dlt.destinations.databricks(
             credentials={
                 "server_hostname": databricks_host,
@@ -37,7 +42,7 @@ def configure_dlt_pipeline():
             },
             dataset_name=databricks_schema,
         ),
-        dev_mode=False
+        dev_mode=True  # Use dev_mode to avoid persistent storage issues
     )
     
     return pipeline
