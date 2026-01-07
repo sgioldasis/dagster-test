@@ -1,7 +1,7 @@
 # src/dbt_cloud_orchestration/defs/dbt/definitions.py
 
 import dagster as dg
-from dbt_cloud_orchestration.defs.dbt_cloud_orchestration import (
+from dbt_cloud_orchestration.defs.dbt.assets import (
     my_dbt_cloud_assets,
     dbt_cloud_polling_sensor,
     workspace,
