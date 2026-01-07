@@ -11,7 +11,8 @@ import requests
 @asset(
     deps=[dg.AssetKey("stg_kaizen_wars__fact_virtual")],
     description="Asset that counts records in stg_kaizen_wars__fact_virtual and writes to file",
-    automation_condition=dg.AutomationCondition.any_deps_updated()
+    automation_condition=dg.AutomationCondition.any_deps_updated(),
+    group_name="downstream"
 )
 def fact_virtual_count_asset(context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace):
     """

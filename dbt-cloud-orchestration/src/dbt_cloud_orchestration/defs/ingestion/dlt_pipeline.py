@@ -122,7 +122,7 @@ def kaizen_wars_source():
 
 
 # Create Dagster assets for DLT pipeline
-@dlt_assets(dlt_source=csv_data_source(), dlt_pipeline=configure_dlt_pipeline())
+@dlt_assets(dlt_source=csv_data_source(), dlt_pipeline=configure_dlt_pipeline(), group_name="ingestion")
 def dlt_databricks_assets(context, dlt: DagsterDltResource):
     """Dagster assets for DLT Databricks ingestion"""
     yield from dlt.run(
@@ -132,7 +132,7 @@ def dlt_databricks_assets(context, dlt: DagsterDltResource):
     )
 
 
-@dlt_assets(dlt_source=kaizen_wars_source(), dlt_pipeline=configure_dlt_pipeline())
+@dlt_assets(dlt_source=kaizen_wars_source(), dlt_pipeline=configure_dlt_pipeline(), group_name="ingestion")
 def kaizen_wars_ingest_assets(context, dlt: DagsterDltResource):
     """Dagster assets for Kaizen Wars DLT ingestion"""
     yield from dlt.run(

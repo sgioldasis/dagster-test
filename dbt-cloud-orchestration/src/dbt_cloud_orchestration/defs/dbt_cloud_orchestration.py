@@ -32,7 +32,7 @@ workspace = DbtCloudWorkspace(
 # Builds your asset graph
 # Builds your asset graph
 # Builds your asset graph
-@dbt_cloud_assets(workspace=workspace)
+@dbt_cloud_assets(workspace=workspace, group_name="dbt")
 def my_dbt_cloud_assets(
     context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
 ):
@@ -71,7 +71,7 @@ else:
         deps=[dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])],
         automation_condition=dg.AutomationCondition.any_deps_updated(),
         compute_kind="dbt",
-        group_name="kaizen_wars"
+        group_name="dbt"
     )
     def stg_kaizen_wars__fact_virtual(context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace):
         """
