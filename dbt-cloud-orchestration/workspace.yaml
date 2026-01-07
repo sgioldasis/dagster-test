@@ -1,0 +1,18 @@
+load_from:
+  # Ingestion Code Location - DLT Databricks pipelines
+  - python_file:
+      relative_path: "src/dbt_cloud_orchestration/defs/ingestion/definitions.py"
+      working_directory: "."
+      location_name: "ingestion"
+
+  # DBT Code Location - DBT Cloud assets and jobs
+  - python_file:
+      relative_path: "src/dbt_cloud_orchestration/defs/dbt/definitions.py"
+      working_directory: "."
+      location_name: "dbt"
+
+  # Downstream Code Location - Downstream processing assets
+  - python_file:
+      relative_path: "src/dbt_cloud_orchestration/defs/downstream/definitions.py"
+      working_directory: "."
+      location_name: "downstream"

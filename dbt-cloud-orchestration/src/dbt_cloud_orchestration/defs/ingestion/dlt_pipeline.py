@@ -1,4 +1,4 @@
-# src/dbt_cloud_orchestration/defs/dlt_databricks_ingest/dlt_pipeline.py
+# src/dbt_cloud_orchestration/defs/ingestion/dlt_pipeline.py
 
 import os
 import dlt

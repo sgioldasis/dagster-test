@@ -44,13 +44,64 @@ pip install -e ".[dev]"
 
 ### Running Dagster
 
-Start the Dagster UI web server:
+Start the Dagster UI web server with the multi-code-location workspace:
 
 ```bash
-dg dev
+dg dev --workspace workspace.yaml
 ```
 
+This will load the three separate code locations:
+- `ingestion` - DLT Databricks pipelines
+- `dbt` - DBT Cloud assets and jobs
+- `downstream` - Downstream processing assets
+
 Open http://localhost:3000 in your browser to see the project.
+
+> **Note**: If you want to use the original single code location configuration, you can rename `definitions_backup.py` back to `definitions.py` and run `dg dev` without the workspace flag.
+
+## Project Structure
+
+This project has been reorganized into **three separate Dagster code locations** for better separation of concerns:
+
+```
+dbt-cloud-orchestration/
+├── workspace.yaml                  # Workspace configuration for 3 code locations
+├── definitions_backup.py          # Original single code location (backup)
+├── src/dbt_cloud_orchestration/
+│   ├── defs/
+│   │   ├── ingestion/              # 📦 Code Location 1: Ingestion
+│   │   │   ├── definitions.py      # DLT Databricks pipelines
+│   │   │   └── dlt_pipeline.py      # Moved DLT pipeline
+│   │   │
+│   │   ├── dbt/                   # 📦 Code Location 2: DBT
+│   │   │   └── definitions.py      # DBT Cloud assets
+│   │   │
+│   │   ├── downstream/            # 📦 Code Location 3: Downstream
+│   │   │   ├── definitions.py      # Downstream assets
+│   │   │   └── fact_virtual_count.py # Moved downstream asset
+│   │   │
+│   │   └── dbt_cloud_orchestration.py  # Updated DBT assets
+```
+
+### Code Locations Overview
+
+1. **Ingestion** (`ingestion`)
+   - **Purpose**: Data ingestion pipelines
+   - **Contents**: DLT Databricks assets, schedules
+   - **Assets**: `dlt_databricks_assets`, `kaizen_wars_ingest_assets`
+   - **Schedules**: `kaizen_wars_dlt_schedule`
+
+2. **DBT** (`dbt`)
+   - **Purpose**: DBT Cloud assets and jobs
+   - **Contents**: DBT Cloud assets, sensors, jobs
+   - **Assets**: `my_dbt_cloud_assets`, `kaizen_wars_assets`
+   - **Sensors**: `dbt_cloud_polling_sensor`
+   - **Jobs**: `dbt_cloud_job_trigger`
+
+3. **Downstream** (`downstream`)
+   - **Purpose**: Downstream processing
+   - **Contents**: Post-processing assets
+   - **Assets**: `fact_virtual_count_asset`
 
 ## Learn more
 
