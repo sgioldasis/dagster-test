@@ -4,13 +4,11 @@ import os
 import dlt
 import pandas as pd
 import dagster as dg
-from dagster_dlt import dlt_assets, DagsterDltResource
 from dagster import (
     asset,
     Definitions,
     ScheduleDefinition,
     FreshnessPolicy,
-    LegacyFreshnessPolicy,
     AssetKey,
 )
 from dagster_dlt import dlt_assets, DagsterDltResource
@@ -40,7 +38,7 @@ def configure_dlt_pipeline():
     # Generate a unique pipeline name to avoid storage conflicts
     pipeline_name = f"databricks_ingestion_{uuid.uuid4().hex[:8]}"
 
-    # Configure DLT pipeline with proper settings to handle views and schema evolution
+    # Configure DLT pipeline with dev_mode=True to avoid persistent storage issues
     pipeline = dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=dlt.destinations.databricks(
@@ -65,9 +63,6 @@ def customers_resource():
 
     try:
         df = pd.read_csv(data_path)
-        # Ensure we have the required columns
-        if "id" not in df.columns:
-            df["id"] = range(len(df))
         yield from df.to_dict(orient="records")
     except FileNotFoundError:
         print(f"Warning: Could not find customers data at {data_path}")
@@ -169,14 +164,11 @@ def kaizen_wars_source():
 )
 def dlt_databricks_assets(context, dlt: DagsterDltResource):
     """Dagster assets for DLT Databricks ingestion"""
-    # Run the DLT pipeline
-    for materialization in dlt.run(
+    yield from dlt.run(
         context=context,
         dlt_source=csv_data_source(),
         dlt_pipeline=configure_dlt_pipeline(),
-    ):
-        # Forward the materialization events
-        yield materialization
+    )
 
 
 @dlt_assets(
@@ -186,49 +178,36 @@ def dlt_databricks_assets(context, dlt: DagsterDltResource):
 )
 def kaizen_wars_ingest_assets(context, dlt: DagsterDltResource):
     """Dagster assets for Kaizen Wars DLT ingestion"""
-    # Run the DLT pipeline and capture results
-    pipeline_result = dlt.run(
+    yield from dlt.run(
         context=context,
         dlt_source=kaizen_wars_source(),
         dlt_pipeline=configure_dlt_pipeline(),
     )
 
-    # Forward any materialization events from DLT
-    for materialization in pipeline_result:
-        yield materialization
-
-    # Also ensure we have at least one materialization event
-    # This is needed for freshness evaluation to work
-    if not hasattr(pipeline_result, "__iter__") or pipeline_result is None:
-        # If DLT didn't return materializations, create one manually
-        from dagster import Materialization
-
-        yield Materialization(
-            label="kaizen_wars_fact_virtual",
-            description="Kaizen Wars fact_virtual data loaded via DLT",
-        )
-
 
 # Create individual assets with specific freshness policies
 
 
-# Apply freshness policies to DLT assets (the correct way)
-def apply_freshness_policies_to_dlt_assets(assets_def):
-    """Apply freshness policies to all assets in a DLT AssetsDefinition"""
-    return assets_def.map_asset_specs(
-        lambda spec: spec._replace(
-            automation_condition=dg.AutomationCondition.eager(),  # Enable automatic freshness checks
-            legacy_freshness_policy=LegacyFreshnessPolicy(
-                maximum_lag_minutes=1
-            ),  # Shows "Expected: 1m" in UI
-        )
+# Apply freshness policies to both DLT assets with correct asset keys
+# Keep freshness policy for UI but disable automation to prevent automatic runs
+dlt_databricks_assets = dlt_databricks_assets.map_asset_specs(
+    lambda spec: spec._replace(
+        automation_condition=None,  # Disable automatic runs
+        freshness_policy=FreshnessPolicy.cron(
+            deadline_cron="*/1 * * * *",  # Check freshness every minute
+            lower_bound_delta=timedelta(minutes=1),
+        ),
     )
+)
 
-
-# Apply freshness policies to all DLT assets
-dlt_databricks_assets = apply_freshness_policies_to_dlt_assets(dlt_databricks_assets)
-kaizen_wars_ingest_assets = apply_freshness_policies_to_dlt_assets(
-    kaizen_wars_ingest_assets
+kaizen_wars_ingest_assets = kaizen_wars_ingest_assets.map_asset_specs(
+    lambda spec: spec._replace(
+        automation_condition=None,  # Disable automatic runs
+        freshness_policy=FreshnessPolicy.cron(
+            deadline_cron="*/1 * * * *",  # Check freshness every minute
+            lower_bound_delta=timedelta(minutes=1),
+        ),
+    )
 )
 
 # Include all assets in definitions

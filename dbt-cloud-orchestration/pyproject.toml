@@ -3,7 +3,7 @@ name = "dbt_cloud_orchestration"
 requires-python = ">=3.10,<3.15"
 version = "0.1.0"
 dependencies = [
-    "dagster==1.12.8",
+    "dagster>=1.12.8",
     "dagster-dbt>=0.28.8",
     "dagster-dlt>=0.28.8",
     "dlt[databricks]>=0.4.0",
@@ -30,8 +30,5 @@ directory_type = "project"
 
 [tool.dg.project]
 root_module = "dbt_cloud_orchestration"
-registry_modules = [
-    "dbt_cloud_orchestration.components.*",
-]
 
 
