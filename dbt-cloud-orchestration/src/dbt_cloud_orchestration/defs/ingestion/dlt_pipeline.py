@@ -58,48 +58,6 @@ def configure_dlt_pipeline():
     return pipeline
 
 
-@dlt.resource(name="customers", write_disposition="replace")
-def customers_resource():
-    """Load customers data from CSV file"""
-    data_path = os.getenv("CUSTOMERS_DATA_PATH", "data/raw_customers.csv")
-
-    try:
-        df = pd.read_csv(data_path)
-        # Ensure we have the required columns
-        if "id" not in df.columns:
-            df["id"] = range(len(df))
-        yield from df.to_dict(orient="records")
-    except FileNotFoundError:
-        print(f"Warning: Could not find customers data at {data_path}")
-        yield from []
-
-
-@dlt.resource(name="orders", write_disposition="replace")
-def orders_resource():
-    """Load orders data from CSV file"""
-    data_path = os.getenv("ORDERS_DATA_PATH", "data/raw_orders.csv")
-
-    try:
-        df = pd.read_csv(data_path)
-        yield from df.to_dict(orient="records")
-    except FileNotFoundError:
-        print(f"Warning: Could not find orders data at {data_path}")
-        yield from []
-
-
-@dlt.resource(name="payments", write_disposition="replace")
-def payments_resource():
-    """Load payments data from CSV file"""
-    data_path = os.getenv("PAYMENTS_DATA_PATH", "data/raw_payments.csv")
-
-    try:
-        df = pd.read_csv(data_path)
-        yield from df.to_dict(orient="records")
-    except FileNotFoundError:
-        print(f"Warning: Could not find payments data at {data_path}")
-        yield from []
-
-
 @dlt.resource(name="fact_virtual", write_disposition="replace")
 def fact_virtual_resource():
     """Load fact_virtual data from CSV file"""
@@ -147,36 +105,10 @@ def fact_virtual_resource():
         ]
 
 
-@dlt.source
-def csv_data_source():
-    """DLT source for CSV data ingestion"""
-    yield customers_resource
-    yield orders_resource
-    yield payments_resource
-
-
 @dlt.source(name="kaizen_wars")
 def kaizen_wars_source():
     """DLT source for Kaizen Wars data ingestion"""
     yield fact_virtual_resource
-
-
-# Create Dagster assets for DLT pipeline
-@dlt_assets(
-    dlt_source=csv_data_source(),
-    dlt_pipeline=configure_dlt_pipeline(),
-    group_name="ingestion",
-)
-def dlt_databricks_assets(context, dlt: DagsterDltResource):
-    """Dagster assets for DLT Databricks ingestion"""
-    # Run the DLT pipeline
-    for materialization in dlt.run(
-        context=context,
-        dlt_source=csv_data_source(),
-        dlt_pipeline=configure_dlt_pipeline(),
-    ):
-        # Forward the materialization events
-        yield materialization
 
 
 @dlt_assets(
@@ -217,7 +149,6 @@ def apply_freshness_policies_to_dlt_assets(assets_def):
     """Apply freshness policies to all assets in a DLT AssetsDefinition"""
     return assets_def.map_asset_specs(
         lambda spec: spec._replace(
-            automation_condition=dg.AutomationCondition.eager(),  # Enable automatic freshness checks
             legacy_freshness_policy=LegacyFreshnessPolicy(
                 maximum_lag_minutes=1
             ),  # Shows "Expected: 1m" in UI
@@ -226,13 +157,12 @@ def apply_freshness_policies_to_dlt_assets(assets_def):
 
 
 # Apply freshness policies to all DLT assets
-dlt_databricks_assets = apply_freshness_policies_to_dlt_assets(dlt_databricks_assets)
 kaizen_wars_ingest_assets = apply_freshness_policies_to_dlt_assets(
     kaizen_wars_ingest_assets
 )
 
 # Include all assets in definitions
-all_assets = [dlt_databricks_assets, kaizen_wars_ingest_assets]
+all_assets = [kaizen_wars_ingest_assets]
 
 
 # Schedule for Kaizen Wars DLT ingestion (Every 5 minutes)

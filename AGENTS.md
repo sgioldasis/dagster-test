@@ -20,7 +20,7 @@ cd <project-folder> && uv run pytest -v
 ### Running Dagster Development Server
 ```bash
 task dg-dev -- <project-folder>
-cd <project-folder> && dg dev
+cd <project-folder> && if [ -f workspace.yaml ]; then dg dev --workspace workspace.yaml; else dg dev; fi
 ```
 
 ### Available Projects

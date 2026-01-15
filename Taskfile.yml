@@ -20,7 +20,7 @@ tasks:
     cmds:
       - task: sync
         vars: {CLI_ARGS: '{{.CLI_ARGS}}'}
-      - dg dev
+      - 'if [ -f workspace.yaml ]; then dg dev --workspace workspace.yaml; else dg dev; fi'
     dir: "{{.CLI_ARGS}}"
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'

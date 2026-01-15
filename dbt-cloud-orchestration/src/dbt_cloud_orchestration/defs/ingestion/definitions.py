@@ -2,47 +2,21 @@
 
 import dagster as dg
 from dbt_cloud_orchestration.defs.ingestion.dlt_pipeline import (
-    dlt_databricks_assets,
     kaizen_wars_ingest_assets,
     kaizen_wars_dlt_schedule,
 )
-from dbt_cloud_orchestration.defs.ingestion.simple_freshness_sensor import (
-    simple_freshness_sensor_def,
-)
+
 from dagster_dlt import DagsterDltResource
 from dagster import AutomationConditionSensorDefinition
 
-# Add automation sensor for DLT assets (disabled since we use manual control)
-# We keep the sensor but it won't trigger since automation_condition is None
-dlt_automation_sensor = AutomationConditionSensorDefinition(
-    name="dlt_automation_sensor",
-    target=dg.AssetSelection.keys(
-        "dlt_csv_data_source_customers",
-        "dlt_csv_data_source_orders",
-        "dlt_csv_data_source_payments",
-        "dlt_kaizen_wars_fact_virtual",
-    ),
-    use_user_code_server=True,
-)
-
-# Schedule for kaizen wars DLT asset (every 2 minutes) - manually triggered for testing
-dlt_freshness_schedule = dg.ScheduleDefinition(
-    name="dlt_materialization_schedule",
-    target=dg.AssetSelection.keys("dlt_kaizen_wars_fact_virtual"),
-    cron_schedule="*/2 * * * *",
-)
 
 # Ingestion-specific Definitions
 defs = dg.Definitions(
     assets=[
-        dlt_databricks_assets,
         kaizen_wars_ingest_assets,
     ],
-    schedules=[kaizen_wars_dlt_schedule, dlt_freshness_schedule],
-    sensors=[
-        dlt_automation_sensor,
-        simple_freshness_sensor_def,
-    ],
+    schedules=[kaizen_wars_dlt_schedule],
+    sensors=[],
     resources={
         "dlt": DagsterDltResource(),
     },
