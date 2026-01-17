@@ -202,3 +202,4 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 fact_virtual_count.json
+output/

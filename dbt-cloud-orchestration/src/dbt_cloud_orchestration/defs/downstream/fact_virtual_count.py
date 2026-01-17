@@ -1,11 +1,15 @@
 # src/dbt_cloud_orchestration/defs/downstream/fact_virtual_count.py
 
-import os
 import time
 import json
+from pathlib import Path
+
 import dagster as dg
 from dagster import asset, EnvVar
 import requests
+
+
+OUTPUT_DIR = Path(EnvVar("OUTPUT_DIR").get_value() or "./output")
 
 
 @asset(
@@ -47,7 +51,8 @@ def fact_virtual_count_asset(context: dg.AssetExecutionContext):
         account_id, token, access_url, context
     )
 
-    output_file = "fact_virtual_count.json"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_file = OUTPUT_DIR / "fact_virtual_count.json"
     with open(output_file, "w") as f:
         json.dump(
             {
