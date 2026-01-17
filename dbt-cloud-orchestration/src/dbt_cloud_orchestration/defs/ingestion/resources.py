@@ -1,23 +1,8 @@
+# src/dbt_cloud_orchestration/defs/ingestion/resources.py
+"""Resources for the ingestion code location."""
+
 import dagster as dg
 from pydantic import Field
-from dagster import EnvVar
-
-
-class DataPathConfig(dg.ConfigurableResource):
-    """Configuration for data file paths."""
-
-    fact_virtual_path: str = Field(description="Path to fact virtual data CSV")
-
-
-class DbtCloudCredentials(dg.ConfigurableResource):
-    """Credentials for connecting to dbt Cloud."""
-
-    account_id: int = Field(description="dbt Cloud account ID")
-    access_url: str = Field(description="dbt Cloud access URL")
-    token: str = Field(description="dbt Cloud API token")
-    project_id: int = Field(description="dbt Cloud project ID")
-    environment_id: int = Field(description="dbt Cloud environment ID")
-    job_id: int | None = Field(default=None, description="dbt Cloud job ID")
 
 
 class DatabricksCredentials(dg.ConfigurableResource):
@@ -46,3 +31,6 @@ class DatabricksCredentials(dg.ConfigurableResource):
             "http_path": http_path,
             "catalog": self.catalog,
         }
+
+
+__all__ = ["DatabricksCredentials"]

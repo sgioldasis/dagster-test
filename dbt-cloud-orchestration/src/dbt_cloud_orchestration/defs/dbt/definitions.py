@@ -12,8 +12,8 @@ coupling between code locations.
 import dagster as dg
 from dagster import AutomationConditionSensorDefinition, EnvVar, SourceAsset
 
-from dbt_cloud_orchestration.defs.dbt.assets import create_dbt_cloud_definitions
-from dbt_cloud_orchestration.defs.resources import DbtCloudCredentials
+from .assets import create_dbt_cloud_definitions
+from .resources import DbtCloudCredentials
 
 
 automation_sensor = AutomationConditionSensorDefinition(

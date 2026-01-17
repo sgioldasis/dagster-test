@@ -18,7 +18,7 @@ from dagster_dbt.cloud_v2.resources import (
 from dagster_dbt.cloud_v2.sensor_builder import build_dbt_cloud_polling_sensor
 import requests
 
-from dbt_cloud_orchestration.defs.resources import DbtCloudCredentials
+from .resources import DbtCloudCredentials
 
 
 def create_dbt_cloud_workspace(credentials: DbtCloudCredentials) -> DbtCloudWorkspace:

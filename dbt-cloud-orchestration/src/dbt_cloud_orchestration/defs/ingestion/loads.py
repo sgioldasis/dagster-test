@@ -1,7 +1,7 @@
 import os
 import dlt
 
-from dbt_cloud_orchestration.defs.resources import DatabricksCredentials
+from .resources import DatabricksCredentials
 
 
 def _get_databricks_credentials() -> dict:

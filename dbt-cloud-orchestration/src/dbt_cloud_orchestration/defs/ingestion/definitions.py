@@ -20,8 +20,8 @@ from dagster import (
 from dagster._core.storage.dagster_run import DagsterRunStatus
 from dagster_dlt import dlt_assets, DagsterDltResource
 
-from dbt_cloud_orchestration.defs.ingestion.loads import pipeline
-from dbt_cloud_orchestration.defs.ingestion.dlt_pipeline import kaizen_wars_source
+from .loads import pipeline
+from .dlt_pipeline import kaizen_wars_source
 
 
 @dlt_assets(

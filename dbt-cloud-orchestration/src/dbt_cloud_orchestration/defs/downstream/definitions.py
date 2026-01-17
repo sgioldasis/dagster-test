@@ -12,7 +12,7 @@ coupling between code locations.
 import dagster as dg
 from dagster import EnvVar, SourceAsset
 
-from dbt_cloud_orchestration.defs.downstream.fact_virtual_count import (
+from .fact_virtual_count import (
     fact_virtual_count_asset,
 )
 
