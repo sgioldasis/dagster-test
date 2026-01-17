@@ -1,5 +1,9 @@
 # src/dbt_cloud_orchestration/defs/ingestion/definitions.py
-"""Ingestion code location definitions using DLT component."""
+"""Ingestion code location - DLT pipeline for loading data.
+
+This code location is independent and produces the dlt_kaizen_wars_fact_virtual asset
+that can be consumed by other code locations via SourceAsset references.
+"""
 
 import dagster as dg
 from dagster import (
@@ -16,11 +20,12 @@ from dagster import (
 from dagster._core.storage.dagster_run import DagsterRunStatus
 from dagster_dlt import dlt_assets, DagsterDltResource
 
-from dbt_cloud_orchestration.defs.ingestion.loads import kaizen_wars_source, pipeline
+from dbt_cloud_orchestration.defs.ingestion.loads import pipeline
+from dbt_cloud_orchestration.defs.ingestion.dlt_pipeline import kaizen_wars_source
 
 
 @dlt_assets(
-    dlt_source=kaizen_wars_source,
+    dlt_source=kaizen_wars_source(),
     dlt_pipeline=pipeline,
     name="kaizen_wars_dlt_assets",
 )
@@ -29,7 +34,6 @@ def dlt_fact_virtual_asset(context, dlt: DagsterDltResource):
     yield from dlt.run(context=context)
 
 
-# Modify the asset specs to have the correct key and freshness policy
 dlt_fact_virtual_asset = dlt_fact_virtual_asset.map_asset_specs(
     lambda spec: AssetSpec(
         key="dlt_kaizen_wars_fact_virtual",
@@ -69,11 +73,8 @@ dlt_fact_virtual_sensor = SensorDefinition(
 )
 
 
-@dg.definitions
-def defs() -> Definitions:
-    """Load definitions with custom DLT asset."""
-    return Definitions(
-        assets=[dlt_fact_virtual_asset],
-        resources={"dlt": DagsterDltResource()},
-        sensors=[dlt_fact_virtual_sensor],
-    )
+ingestion_defs = Definitions(
+    assets=[dlt_fact_virtual_asset],
+    resources={"dlt": DagsterDltResource()},
+    sensors=[dlt_fact_virtual_sensor],
+)
