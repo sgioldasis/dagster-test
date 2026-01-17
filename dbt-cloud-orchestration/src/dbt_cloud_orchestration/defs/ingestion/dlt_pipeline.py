@@ -1,15 +1,17 @@
 # src/dbt_cloud_orchestration/defs/ingestion/dlt_pipeline.py
 """DLT resources and source definitions for Kaizen Wars data ingestion."""
 
-import os
 import dlt
 import pandas as pd
+from dagster import EnvVar
 
 
 @dlt.resource(name="fact_virtual", write_disposition="replace")
 def fact_virtual_resource():
     """Load fact_virtual data from CSV file."""
-    data_path = os.getenv("FACT_VIRTUAL_DATA_PATH", "data/raw_fact_virtual.csv")
+    data_path = (
+        EnvVar("FACT_VIRTUAL_DATA_PATH").get_value() or "data/raw_fact_virtual.csv"
+    )
 
     try:
         df = pd.read_csv(data_path)

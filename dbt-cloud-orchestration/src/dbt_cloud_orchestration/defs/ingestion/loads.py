@@ -1,33 +1,31 @@
-import os
 import dlt
+from dagster import EnvVar
 
 from .resources import DatabricksCredentials
 
 
-def _get_databricks_credentials() -> dict:
-    """Get Databricks connection credentials from environment variables."""
-    databricks_host = os.getenv("DATABRICKS_HOST")
-    databricks_token = os.getenv("DATABRICKS_TOKEN")
-    databricks_catalog = os.getenv("DATABRICKS_CATALOG", "test")
+def get_databricks_credentials() -> dict:
+    """Get Databricks connection credentials using DatabricksCredentials resource.
 
-    warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
-    http_path = os.getenv("DATABRICKS_HTTP_PATH")
-    if not http_path and warehouse_id:
-        http_path = f"/sql/1.0/warehouses/{warehouse_id}"
-
-    return {
-        "server_hostname": databricks_host,
-        "access_token": databricks_token,
-        "http_path": http_path,
-        "catalog": databricks_catalog,
-    }
+    This function creates a DatabricksCredentials instance from environment variables
+    and returns a dictionary compatible with DLT.
+    """
+    credentials = DatabricksCredentials(
+        host=EnvVar("DATABRICKS_HOST").get_value() or "",
+        token=EnvVar("DATABRICKS_TOKEN").get_value() or "",
+        warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
+        http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
+        catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
+        dataset_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+    )
+    return credentials.get_credentials_dict()
 
 
 pipeline = dlt.pipeline(
     pipeline_name="kaizen_wars_ingestion",
     destination=dlt.destinations.databricks(
-        credentials=_get_databricks_credentials(),
+        credentials=get_databricks_credentials(),
     ),
-    dataset_name=os.getenv("DATABRICKS_SCHEMA", "main"),
+    dataset_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
     dev_mode=False,
 )
