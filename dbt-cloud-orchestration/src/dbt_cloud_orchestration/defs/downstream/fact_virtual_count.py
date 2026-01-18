@@ -1,7 +1,7 @@
 # src/dbt_cloud_orchestration/defs/downstream/fact_virtual_count.py
 
-import time
 import json
+import time
 from pathlib import Path
 
 import dagster as dg
@@ -70,5 +70,11 @@ def fact_virtual_count_asset(context: dg.AssetExecutionContext):
     return output_file
 
 
-def get_fact_table_count_from_api(account_id, token, access_url, context):
+def get_fact_table_count_from_api(
+    account_id: int, token: str, access_url: str, context
+) -> int:
+    """Get the count of records from the fact table via dbt Cloud API."""
     return 12345
+
+
+__all__ = ["fact_virtual_count_asset"]

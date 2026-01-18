@@ -8,45 +8,37 @@ that can be consumed by other code locations via SourceAsset references.
 import dagster as dg
 from dagster import (
     Definitions,
-    AssetSpec,
     AutomationCondition,
+    AutomationConditionSensorDefinition,
     LegacyFreshnessPolicy,
     SensorDefinition,
     RunRequest,
     AssetSelection,
     SkipReason,
     RunsFilter,
+    AssetExecutionContext,
 )
 from dagster._core.storage.dagster_run import DagsterRunStatus
-from dagster_dlt import dlt_assets, DagsterDltResource
+from dagster_dlt import dlt_assets, DagsterDltResource, DagsterDltTranslator
 
 from .loads import pipeline
 from .dlt_pipeline import kaizen_wars_source
 
 
-@dlt_assets(
-    dlt_source=kaizen_wars_source(),
-    dlt_pipeline=pipeline,
-    name="kaizen_wars_dlt_assets",
-)
-def dlt_fact_virtual_asset(context, dlt: DagsterDltResource):
-    """DLT asset for fact_virtual with correct key and freshness policy."""
-    yield from dlt.run(context=context)
+class KaizenWarsDltTranslator(DagsterDltTranslator):
+    """Custom DLT translator for Kaizen Wars pipeline."""
+
+    def get_asset_key(self, resource) -> dg.AssetKey:
+        return dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])
+
+    def get_group_name(self, resource) -> str:
+        return "ingestion"
 
 
-dlt_fact_virtual_asset = dlt_fact_virtual_asset.map_asset_specs(
-    lambda spec: AssetSpec(
-        key="dlt_kaizen_wars_fact_virtual",
-        group_name="ingestion",
-        description="Loads Kaizen Wars data into Databricks via DLT",
-        legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
-        automation_condition=AutomationCondition.any_deps_updated(),
-        deps=spec.deps,
-        metadata=spec.metadata,
-        tags=spec.tags,
-        kinds=spec.kinds,
-        owners=spec.owners,
-    )
+ingestion_automation_sensor = AutomationConditionSensorDefinition(
+    name="default_automation_sensor",
+    target=dg.AssetSelection.all(),
+    use_user_code_server=True,
 )
 
 
@@ -73,8 +65,36 @@ dlt_fact_virtual_sensor = SensorDefinition(
 )
 
 
+@dlt_assets(
+    dlt_source=kaizen_wars_source(),
+    dlt_pipeline=pipeline,
+    name="kaizen_wars_dlt_assets",
+    dagster_dlt_translator=KaizenWarsDltTranslator(),
+)
+def dlt_kaizen_wars_fact_virtual_asset(
+    context: AssetExecutionContext, dlt: DagsterDltResource
+):
+    """DLT asset for fact_virtual."""
+    yield from dlt.run(context=context)
+
+
+def apply_freshness_policies_to_dlt_assets(assets_def):
+    """Apply freshness policies to all assets in a DLT AssetsDefinition"""
+    return assets_def.map_asset_specs(
+        lambda spec: spec._replace(
+            automation_condition=dg.AutomationCondition.eager(),
+            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
+        )
+    )
+
+
+dlt_kaizen_wars_fact_virtual_asset = apply_freshness_policies_to_dlt_assets(
+    dlt_kaizen_wars_fact_virtual_asset
+)
+
+
 ingestion_defs = Definitions(
-    assets=[dlt_fact_virtual_asset],
+    assets=[dlt_kaizen_wars_fact_virtual_asset],
     resources={"dlt": DagsterDltResource()},
-    sensors=[dlt_fact_virtual_sensor],
+    sensors=[dlt_fact_virtual_sensor, ingestion_automation_sensor],
 )

@@ -16,9 +16,9 @@ def get_databricks_credentials() -> dict:
         warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
         http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
         catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
-        dataset_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+        schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
     )
-    return credentials.get_credentials_dict()
+    return credentials.get_connection_dict()
 
 
 pipeline = dlt.pipeline(

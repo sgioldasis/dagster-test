@@ -18,10 +18,13 @@ from dagster_dbt.cloud_v2.resources import (
 from dagster_dbt.cloud_v2.sensor_builder import build_dbt_cloud_polling_sensor
 import requests
 
-from .resources import DbtCloudCredentials
+from .resources import DbtCloudCredentials, DbtCloudRunConfig
 
 
-def create_dbt_cloud_workspace(credentials: DbtCloudCredentials) -> DbtCloudWorkspace:
+def create_dbt_cloud_workspace(
+    credentials: DbtCloudCredentials,
+    run_config: DbtCloudRunConfig | None = None,
+) -> DbtCloudWorkspace:
     """Create a DbtCloudWorkspace from DbtCloudCredentials resource."""
     sdk_credentials = DbtCloudSdkCredentials(
         account_id=credentials.account_id,
@@ -37,10 +40,15 @@ def create_dbt_cloud_workspace(credentials: DbtCloudCredentials) -> DbtCloudWork
 
 def _create_dbt_cloud_job_trigger_job(
     credentials: DbtCloudCredentials,
+    run_config: DbtCloudRunConfig | None = None,
 ) -> Optional[JobDefinition]:
     """Create a job for triggering dbt Cloud runs, or None if job_id not configured."""
     if not credentials.job_id:
         return None
+
+    timeout = (
+        run_config.timeout_seconds if run_config else credentials.run_timeout_seconds
+    )
 
     @op
     def trigger_dbt_cloud_job_op(context: dg.OpExecutionContext):
@@ -65,6 +73,7 @@ def _create_dbt_cloud_job_trigger_job(
         context.log.info(f"Job triggered, run ID: {run_id}")
 
         status_url = f"{access_url}/api/v2/accounts/{account_id}/runs/{run_id}/"
+        polling_interval = run_config.polling_interval_seconds if run_config else 30
 
         while True:
             status_resp = requests.get(status_url, headers=headers)
@@ -75,7 +84,7 @@ def _create_dbt_cloud_job_trigger_job(
 
             if status in [1, 2, 3]:
                 context.log.info(f"Job still running, status: {status}")
-                time.sleep(10)
+                time.sleep(polling_interval)
                 continue
 
             context.log.info(f"Job completed with status: {status}")
@@ -90,16 +99,21 @@ def _create_dbt_cloud_job_trigger_job(
 
 def create_dbt_cloud_definitions(
     credentials: DbtCloudCredentials,
+    run_config: DbtCloudRunConfig | None = None,
 ) -> tuple:
     """Create dbt Cloud workspace, assets, sensor, and job trigger from credentials."""
-    workspace = create_dbt_cloud_workspace(credentials)
-    dbt_cloud_job_trigger = _create_dbt_cloud_job_trigger_job(credentials)
+    workspace = create_dbt_cloud_workspace(credentials, run_config)
+    dbt_cloud_job_trigger = _create_dbt_cloud_job_trigger_job(credentials, run_config)
+
+    timeout = (
+        run_config.timeout_seconds if run_config else credentials.run_timeout_seconds
+    )
 
     @dbt_cloud_assets(workspace=workspace, group_name="dbt")
     def my_dbt_cloud_assets(
         context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
     ):
-        yield from dbt_cloud.cli(args=["build"], context=context).wait(timeout=600)
+        yield from dbt_cloud.cli(args=["build"], context=context).wait(timeout=timeout)
 
     discovered_asset_keys = {k.path[-1] for k in my_dbt_cloud_assets.keys}
     target_key = "stg_kaizen_wars__fact_virtual"
@@ -148,7 +162,7 @@ def create_dbt_cloud_definitions(
             """Formally managed dbt asset for Kaizen Wars fact_virtual (Explicit Definition)."""
             yield from dbt_cloud.cli(
                 args=["build", "--select", target_key], context=context
-            ).wait(timeout=600)
+            ).wait(timeout=timeout)
 
         kaizen_wars_assets = [stg_kaizen_wars__fact_virtual]
 
@@ -165,6 +179,7 @@ def create_dbt_cloud_definitions(
 
 __all__ = [
     "DbtCloudCredentials",
+    "DbtCloudRunConfig",
     "create_dbt_cloud_definitions",
     "workspace",
     "my_dbt_cloud_assets",
