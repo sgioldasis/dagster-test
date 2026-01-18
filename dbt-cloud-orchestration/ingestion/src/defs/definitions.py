@@ -1,9 +1,4 @@
-# src/dbt_cloud_orchestration/defs/ingestion/definitions.py
-"""Ingestion code location - DLT pipeline for loading data.
-
-This code location is independent and produces the dlt_kaizen_wars_fact_virtual asset
-that can be consumed by other code locations via SourceAsset references.
-"""
+"""Ingestion code location - DLT pipeline for loading data."""
 
 import dagster as dg
 from dagster import (
@@ -93,8 +88,9 @@ dlt_kaizen_wars_fact_virtual_asset = apply_freshness_policies_to_dlt_assets(
 )
 
 
-ingestion_defs = Definitions(
-    assets=[dlt_kaizen_wars_fact_virtual_asset],
-    resources={"dlt": DagsterDltResource()},
-    sensors=[dlt_fact_virtual_sensor, ingestion_automation_sensor],
-)
+def ingestion_defs() -> dg.Definitions:
+    return Definitions(
+        assets=[dlt_kaizen_wars_fact_virtual_asset],
+        resources={"dlt": DagsterDltResource()},
+        sensors=[dlt_fact_virtual_sensor, ingestion_automation_sensor],
+    )

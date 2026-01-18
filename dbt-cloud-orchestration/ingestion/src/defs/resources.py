@@ -1,4 +1,4 @@
-# src/dbt_cloud_orchestration/defs/ingestion/resources.py
+# ingestion/src/ingestion/defs/resources.py
 """Resources for the ingestion code location."""
 
 import dagster as dg

@@ -1,13 +1,4 @@
-# src/dbt_cloud_orchestration/defs/downstream/definitions.py
-"""
-Downstream code location - Independent processing assets.
-
-This code location is independent but depends on:
-- stg_kaizen_wars__fact_virtual (from dbt code location)
-
-Cross-location dependencies are declared via SourceAsset to avoid
-coupling between code locations.
-"""
+"""Downstream code location - Independent processing assets."""
 
 import dagster as dg
 from dagster import EnvVar, SourceAsset
@@ -19,6 +10,7 @@ from .fact_virtual_count import (
 stg_kaizen_wars_fact_virtual_source = SourceAsset(
     key="stg_kaizen_wars__fact_virtual",
     description="dbt staging asset from dbt code location",
+    group_name="dbt",
 )
 
 

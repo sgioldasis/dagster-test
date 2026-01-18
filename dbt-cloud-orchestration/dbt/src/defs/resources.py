@@ -1,4 +1,4 @@
-# src/dbt_cloud_orchestration/defs/dbt/resources.py
+# dbt/src/dbt/defs/resources.py
 """Resources for the dbt code location."""
 
 import dagster as dg

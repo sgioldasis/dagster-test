@@ -1,18 +1,15 @@
 load_from:
-  # Ingestion Code Location - DLT Databricks pipelines
   - python_module:
-      module_name: "dbt_cloud_orchestration.defs.ingestion.definitions"
+      module_name: "ingestion.src.defs.definitions"
       attribute: "ingestion_defs"
       location_name: "ingestion"
 
-  # DBT Code Location - DBT Cloud assets and jobs
   - python_module:
-      module_name: "dbt_cloud_orchestration.defs.dbt.definitions"
+      module_name: "dbt.src.defs.definitions"
       attribute: "dbt_defs"
       location_name: "dbt"
 
-  # Downstream Code Location - Downstream processing assets
   - python_module:
-      module_name: "dbt_cloud_orchestration.defs.downstream.definitions"
+      module_name: "downstream.src.defs.definitions"
       attribute: "downstream_defs"
       location_name: "downstream"

@@ -1,13 +1,4 @@
-# src/dbt_cloud_orchestration/defs/dbt/definitions.py
-"""
-DBT Cloud code location.
-
-This code location is independent but depends on:
-- dlt_kaizen_wars_fact_virtual (from ingestion code location)
-
-Cross-location dependencies are declared via SourceAsset to avoid
-coupling between code locations.
-"""
+"""DBT Cloud code location."""
 
 import dagster as dg
 from dagster import AutomationConditionSensorDefinition, EnvVar, SourceAsset
@@ -46,6 +37,7 @@ dbt_cloud_credentials = DbtCloudCredentials(
 dlt_kaizen_wars_fact_virtual_source = SourceAsset(
     key="dlt_kaizen_wars_fact_virtual",
     description="DLT asset from ingestion code location",
+    group_name="ingestion",
 )
 
 

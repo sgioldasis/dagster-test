@@ -1,4 +1,4 @@
-# src/dbt_cloud_orchestration/defs/ingestion/dlt_pipeline.py
+# ingestion/src/ingestion/defs/dlt_pipeline.py
 """DLT resources and source definitions for Kaizen Wars data ingestion."""
 
 import dlt
@@ -6,7 +6,11 @@ import pandas as pd
 from dagster import EnvVar
 
 
-@dlt.resource(name="fact_virtual", write_disposition="replace")
+@dlt.resource(
+    name="fact_virtual",
+    write_disposition="replace",
+    table_format="delta",  # Use Delta format for Databricks
+)
 def fact_virtual_resource():
     """Load fact_virtual data from CSV file."""
     data_path = (
@@ -17,7 +21,6 @@ def fact_virtual_resource():
         df = pd.read_csv(data_path)
         yield from df.to_dict(orient="records")
     except FileNotFoundError:
-        # Generate synthetic test data to ensure table creation
         yield from [
             {
                 "id": 1,

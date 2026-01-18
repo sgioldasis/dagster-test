@@ -1,151 +1,117 @@
-# dbt_cloud_orchestration
+# dbt-cloud-orchestration
 
-## Getting started
+A Dagster + dbt Cloud orchestration monorepo with three independent code locations.
 
-### Installing dependencies
+## Quick Start
 
-**Option 1: uv**
+### Run All Projects Together
 
-Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
-
-Create a virtual environment, and install the required dependencies using _sync_:
+From the monorepo root:
 
 ```bash
+cd /home/savas/dagster-test/dbt-cloud-orchestration
+uv sync --all-packages
+PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+```
+
+Open http://localhost:3000 in your browser.
+
+### Run Individual Projects
+
+Each sub-project can be developed independently:
+
+```bash
+# Ingestion team
+cd /home/savas/dagster-test/dbt-cloud-orchestration/ingestion
 uv sync
+PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+
+# DBT team
+cd /home/savas/dagster-test/dbt-cloud-orchestration/dbt
+uv sync
+PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+
+# Downstream team
+cd /home/savas/dagster-test/dbt-cloud-orchestration/downstream
+uv sync
+PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
 ```
-
-Then, activate the virtual environment:
-
-| OS | Command |
-| --- | --- |
-| MacOS | ```source .venv/bin/activate``` |
-| Windows | ```.venv\Scripts\activate``` |
-
-**Option 2: pip**
-
-Install the python dependencies with [pip](https://pypi.org/project/pip/):
-
-```bash
-python3 -m venv .venv
-```
-
-Then activate the virtual environment:
-
-| OS | Command |
-| --- | --- |
-| MacOS | ```source .venv/bin/activate``` |
-| Windows | ```.venv\Scripts\activate``` |
-
-Install the required dependencies:
-
-```bash
-pip install -e ".[dev]"
-```
-
-### Running Dagster
-
-Start the Dagster UI web server with the multi-code-location workspace:
-
-```bash
-dg dev --workspace workspace.yaml
-```
-
-This will load the three separate code locations:
-- `ingestion` - DLT Databricks pipelines
-- `dbt` - DBT Cloud assets and jobs
-- `downstream` - Downstream processing assets
-
-Open http://localhost:3000 in your browser to see the project.
-
-> **Note**: If you want to use the original single code location configuration, you can rename `definitions_backup.py` back to `definitions.py` and run `dg dev` without the workspace flag.
 
 ## Project Structure
 
-This project has been reorganized into **three separate Dagster code locations** for better separation of concerns:
-
 ```
 dbt-cloud-orchestration/
-├── workspace.yaml                  # Workspace configuration for 3 code locations
-├── definitions_backup.py          # Original single code location (backup)
-├── src/dbt_cloud_orchestration/
-│   ├── defs/
-│   │   ├── ingestion/              # 📦 Code Location 1: Ingestion
-│   │   │   ├── definitions.py      # DLT Databricks pipelines
-│   │   │   └── dlt_pipeline.py      # Moved DLT pipeline
-│   │   │
-│   │   ├── dbt/                   # 📦 Code Location 2: DBT
-│   │   │   └── definitions.py      # DBT Cloud assets
-│   │   │
-│   │   ├── downstream/            # 📦 Code Location 3: Downstream
-│   │   │   ├── definitions.py      # Downstream assets
-│   │   │   └── fact_virtual_count.py # Moved downstream asset
-│   │   │
-│   │   └── dbt_cloud_orchestration.py  # Updated DBT assets
+├── workspace.yaml              # Loads all 3 code locations
+├── pyproject.toml              # Root workspace (uv workspace)
+├── uv.lock                     # Shared lockfile
+├── data/                       # Source data files
+│   ├── raw_fact_virtual.csv
+│   ├── raw_customers.csv
+│   ├── raw_orders.csv
+│   └── raw_payments.csv
+├── ingestion/                  # Team 1: DLT pipeline
+│   ├── pyproject.toml
+│   ├── src/
+│   │   └── defs/
+│   │       └── definitions.py
+│   └── .env                    # Environment variables
+├── dbt/                        # Team 2: dbt Cloud
+│   ├── pyproject.toml
+│   └── src/
+│       └── defs/
+│           └── definitions.py
+└── downstream/                 # Team 3: Downstream
+    ├── pyproject.toml
+    └── src/
+        └── defs/
+            └── definitions.py
 ```
 
-### Code Locations Overview
+## Code Locations
 
-1. **Ingestion** (`ingestion`)
-   - **Purpose**: Data ingestion pipelines
-   - **Contents**: DLT Databricks assets, schedules
-   - **Assets**: `dlt_databricks_assets`, `kaizen_wars_ingest_assets`
-   - **Schedules**: `kaizen_wars_dlt_schedule`
+| Location | Purpose | Key Asset |
+|----------|---------|-----------|
+| `ingestion` | DLT Databricks pipelines | `dlt_kaizen_wars_fact_virtual` |
+| `dbt` | dbt Cloud assets | `stg_kaizen_wars__fact_virtual` |
+| `downstream` | Post-processing | `fact_virtual_count_asset` |
 
-2. **DBT** (`dbt`)
-   - **Purpose**: DBT Cloud assets and jobs
-   - **Contents**: DBT Cloud assets, sensors, jobs
-   - **Assets**: `my_dbt_cloud_assets`, `kaizen_wars_assets`
-   - **Sensors**: `dbt_cloud_polling_sensor`
-   - **Jobs**: `dbt_cloud_job_trigger`
+## Environment Variables
 
-3. **Downstream** (`downstream`)
-   - **Purpose**: Downstream processing
-   - **Contents**: Post-processing assets
-   - **Assets**: `fact_virtual_count_asset`
+Copy `.env` to each subfolder or set these variables:
 
-## Key Benefits
+```bash
+# dbt Cloud
+export DBT_CLOUD_TOKEN=...
+export DBT_CLOUD_ACCOUNT_ID=...
+export DBT_CLOUD_ACCESS_URL=...
+export DBT_CLOUD_PROJECT_ID=...
+export DBT_CLOUD_ENVIRONMENT_ID=...
 
-### ✨ Advantages of the Multi-Code-Location Architecture
+# Databricks (for ingestion)
+export DATABRICKS_HOST=...
+export DATABRICKS_TOKEN=...
+export DATABRICKS_WAREHOUSE_ID=...
 
-1. **Clear Separation of Concerns**
-   - Ingestion, DBT, and downstream processing are logically separated
-   - Each code location has a single, well-defined responsibility
-   - Easier to understand and maintain the project structure
+# Data files (relative to sub-project directory)
+export FACT_VIRTUAL_DATA_PATH=../data/raw_fact_virtual.csv
+```
 
-2. **Team Independence**
-   - Different teams can work on their respective code locations independently
-   - Changes in one area don't affect other areas
-   - Reduced risk of merge conflicts and deployment issues
+## Data
 
-3. **Improved Performance**
-   - Smaller code locations load faster in the Dagster UI
-   - Faster development iteration cycles
-   - Better resource utilization
+Source data files are in the `data/` directory at the monorepo root:
+- `raw_fact_virtual.csv` - Main fact data for the DLT pipeline
+- `raw_customers.csv` - Customer dimension data
+- `raw_orders.csv` - Orders dimension data
+- `raw_payments.csv` - Payments dimension data
 
-4. **Enhanced Maintainability**
-   - Easier to locate and manage related components
-   - Clear ownership boundaries
-   - Simplified debugging and testing
+## Alias for Convenience
 
-5. **Scalable Architecture**
-   - Ready for team growth and additional components
-   - Easy to add new code locations as needed
-   - Supports microservices-like development approach
+Add to your shell profile (`.bashrc` or `.zshrc`):
 
-6. **Better Organization**
-   - Logical grouping of related assets, jobs, and schedules
-   - Clear separation between data ingestion, transformation, and processing
-   - Improved code navigation and discovery
-
-7. **Flexible Deployment**
-   - Code locations can be deployed independently if needed
-   - Supports different deployment strategies for different components
-   - Easier to manage environment-specific configurations
-
-## Learn more
-
-To learn more about this template and Dagster in general:
-
-- [Dagster Documentation](https://docs.dagster.io/)
-- [Dagster University](https://courses.dagster.io/)
-- [Dagster Slack Community](https://dagster.io/slack)
+```bash
+export MONOREPO_ROOT=/home/savas/dagster-test/dbt-cloud-orchestration
+alias dg-all='PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace $MONOREPO_ROOT/workspace.yaml'
+alias dg-ing='cd $MONOREPO_ROOT/ingestion && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
+alias dg-dbt='cd $MONOREPO_ROOT/dbt && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
+alias dg-down='cd $MONOREPO_ROOT/downstream && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
+```

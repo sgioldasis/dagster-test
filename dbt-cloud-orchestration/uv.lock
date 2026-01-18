@@ -12,6 +12,14 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "dbt",
+    "dbt-cloud-orchestration",
+    "downstream",
+    "ingestion",
+]
+
 [[package]]
 name = "agate"
 version = "1.9.1"
@@ -640,6 +648,37 @@ wheels = [
 ]
 
 [[package]]
+name = "dbt"
+version = "0.1.0"
+source = { editable = "dbt" }
+dependencies = [
+    { name = "dagster" },
+    { name = "dagster-dbt" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dagster", specifier = ">=1.12.8" },
+    { name = "dagster-dbt", specifier = ">=0.28.8" },
+    { name = "requests" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
+]
+
+[[package]]
 name = "dbt-adapters"
 version = "1.22.4"
 source = { registry = "https://pypi.org/simple" }
@@ -660,16 +699,7 @@ wheels = [
 [[package]]
 name = "dbt-cloud-orchestration"
 version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "dagster" },
-    { name = "dagster-dbt" },
-    { name = "dagster-dlt" },
-    { name = "dlt", extra = ["databricks"] },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "requests" },
-]
+source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
@@ -679,15 +709,6 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "dagster", specifier = ">=1.12.8" },
-    { name = "dagster-dbt", specifier = ">=0.28.8" },
-    { name = "dagster-dlt", specifier = ">=0.28.8" },
-    { name = "dlt", extras = ["databricks"], specifier = ">=0.4.0" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "requests" },
-]
 
 [package.metadata.requires-dev]
 dev = [
@@ -871,6 +892,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
+]
+
+[[package]]
+name = "downstream"
+version = "0.1.0"
+source = { editable = "downstream" }
+dependencies = [
+    { name = "dagster" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dagster", specifier = ">=1.12.8" },
+    { name = "requests" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
 ]
 
 [[package]]
@@ -1251,6 +1301,41 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a4982d9975a8cbf64f00d4a1ececb53297f1d9a7be1b10/importlib_metadata-8.7.1.tar.gz", hash = "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb", size = 57107, upload-time = "2025-12-21T10:00:19.278Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/5e/f8e9a1d23b9c20a551a8a02ea3637b4642e22c2626e3a13a9a29cdea99eb/importlib_metadata-8.7.1-py3-none-any.whl", hash = "sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151", size = 27865, upload-time = "2025-12-21T10:00:18.329Z" },
+]
+
+[[package]]
+name = "ingestion"
+version = "0.1.0"
+source = { editable = "ingestion" }
+dependencies = [
+    { name = "dagster" },
+    { name = "dagster-dlt" },
+    { name = "dlt", extra = ["databricks"] },
+    { name = "pandas" },
+    { name = "pyarrow" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dagster", specifier = ">=1.12.8" },
+    { name = "dagster-dlt", specifier = ">=0.28.8" },
+    { name = "dlt", extras = ["databricks"], specifier = ">=0.4.0" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "pyarrow", specifier = ">=14.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "dagster-dg-cli" },
+    { name = "dagster-webserver" },
+    { name = "ruff" },
 ]
 
 [[package]]
