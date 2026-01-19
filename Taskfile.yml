@@ -15,6 +15,18 @@ tasks:
       - sh: 'test -n "{{.CLI_ARGS}}"'
         msg: "Error: <folder> argument is required. Example: task project -- dbx-project"
 
+
+  sync-all:
+    desc: "Sync all packages and output PYTHONPATH export command. Usage: task sync-all -- <folder>"
+    dir: "{{.CLI_ARGS}}"
+    cmds:
+      - uv sync --all-packages
+      - echo "export PYTHONPATH=\"$(pwd):\$PYTHONPATH\""
+    preconditions:
+      - sh: 'test -n "{{.CLI_ARGS}}"'
+        msg: "Error: <folder> argument is required. Example: task sync-all -- dbt-cloud-orchestration"
+
+
   dg-dev:
     desc: "Run Dagster dev server. Usage: task dg-dev -- <folder>"
     cmds:
@@ -23,8 +35,14 @@ tasks:
       - 'if [ -f workspace.yaml ]; then dg dev --workspace workspace.yaml; else dg dev; fi'
     dir: "{{.CLI_ARGS}}"
     preconditions:
-      - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Error: <folder> argument is required. Example: task dg-dev -- dbx-project"
+      - {sh: 'test -n "{{.CLI_ARGS}}"', msg: "Error: <folder> argument is required. Example: task dg-dev -- dbx-project"}
+
+  dgdev:
+    desc: "Run Dagster dev server from current folder"
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - 'uv sync --all-packages'
+      - 'if [ -f workspace.yaml ]; then dg dev --workspace workspace.yaml; else dg dev; fi'
 
   pg-prepare:
     desc: "Setup PostgreSQL and load data"
