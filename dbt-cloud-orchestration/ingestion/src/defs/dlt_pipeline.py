@@ -49,9 +49,8 @@ def fact_virtual_csv_resource():
     try:
         df = pd.read_csv(data_path)
         yield from df.to_dict(orient="records")
-    except FileNotFoundError:
-        print(f"[DEBUG] CSV file not found at: {data_path}")
-        yield from []
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"CSV file not found at: {data_path}") from e
 
 
 @dlt.resource(

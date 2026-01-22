@@ -19,6 +19,8 @@ from dagster import (
 from dagster._core.storage.dagster_run import DagsterRunStatus
 from dagster_dlt import dlt_assets, DagsterDltResource, DagsterDltTranslator
 import dlt
+from dotenv import load_dotenv
+import os
 from typing import Iterator
 
 from .loads import get_pipeline, get_postgres_pipeline
@@ -97,6 +99,11 @@ class DagsterDltResourceWithEnvVars(DagsterDltResource):
     def _get_databricks_pipeline(self):
         if self._cached_databricks_pipeline is not None:
             return self._cached_databricks_pipeline
+
+        # Load .env file to ensure environment variables are available
+        from dotenv import load_dotenv
+
+        load_dotenv()
 
         databricks_host = EnvVar("DATABRICKS_HOST").get_value()
         databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
@@ -198,15 +205,26 @@ dlt_kaizen_wars_fact_virtual_asset = apply_freshness_policies_to_dlt_assets(
 
 
 def _create_csv_to_postgres_pipeline_for_decorator():
-    """Create pipeline for UI metadata (CSV → PostgreSQL)."""
+    """Create pipeline for UI metadata with actual credentials."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    # Get actual credentials from environment
+    host = os.environ.get("LOCAL_POSTGRES_HOST", "localhost")
+    port = int(os.environ.get("LOCAL_POSTGRES_PORT", "5432"))
+    user = os.environ.get("LOCAL_POSTGRES_USER", "postgres")
+    password = os.environ.get("LOCAL_POSTGRES_PASSWORD", "")
+    database = os.environ.get("LOCAL_POSTGRES_DATABASE", "postgres")
+
     return dlt.pipeline(
         pipeline_name="csv_to_postgres",
         destination=dlt.destinations.postgres(
-            host="<localhost>",
-            user="postgres",
-            password="<password>",
-            database="postgres",
-            port=5432,
+            host=host,
+            user=user,
+            password=password,
+            database=database,
+            port=port,
         ),
         dataset_name="public",
         dev_mode=False,

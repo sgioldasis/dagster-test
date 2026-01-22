@@ -57,11 +57,25 @@ def get_pipeline(credentials: DatabricksCredentials | None = None):
 
 def get_postgres_pipeline():
     """Create DLT pipeline with local PostgreSQL destination."""
+    from urllib.parse import urlparse
+
     conn_string = get_postgres_connection_string()
     print(f"[DEBUG] Creating local PostgreSQL pipeline with: {conn_string}")
+
+    # Parse connection string for credentials to pass directly to DLT
+    parsed = urlparse(conn_string)
+
+    credentials = {
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "username": parsed.username,
+        "password": parsed.password or "",
+        "database": parsed.path.lstrip("/"),
+    }
+
     return dlt.pipeline(
         pipeline_name="csv_to_postgres",
-        destination=dlt.destinations.postgres(conn_string),
+        destination=dlt.destinations.postgres(credentials=credentials),
         dataset_name="public",
         dev_mode=False,
     )
