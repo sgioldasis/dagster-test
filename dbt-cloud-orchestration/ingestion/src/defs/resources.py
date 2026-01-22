@@ -46,7 +46,7 @@ class DatabricksCredentials(dg.ConfigurableResource):
 
     def get_pipeline_settings(self) -> dict:
         """Get DLT pipeline settings."""
-        settings = {
+        settings: dict = {
             "write_max_concurrent_runs": self.write_max_concurrent_runs,
         }
         if self.retry_policy:

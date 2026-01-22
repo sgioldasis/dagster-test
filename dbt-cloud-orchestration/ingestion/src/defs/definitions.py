@@ -90,7 +90,7 @@ class DagsterDltResourceWithEnvVars(DagsterDltResource):
     """Extended DLT resource that routes to correct destination based on asset being run."""
 
     def __init__(self):
-        super().__init__(dlt_pipeline=None)
+        super().__init__()
         self._cached_databricks_pipeline = None
         self._cached_postgres_pipeline = None
 

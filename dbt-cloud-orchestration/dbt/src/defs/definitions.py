@@ -20,15 +20,14 @@ dbt_cloud_run_config = DbtCloudRunConfig(
     == "true",
 )
 
+dbt_cloud_job_id = EnvVar("DBT_CLOUD_JOB_ID").get_value()
 dbt_cloud_credentials = DbtCloudCredentials(
     account_id=int(EnvVar("DBT_CLOUD_ACCOUNT_ID").get_value() or "0"),
     access_url=EnvVar("DBT_CLOUD_ACCESS_URL").get_value() or "https://cloud.getdbt.com",
     token=EnvVar("DBT_CLOUD_TOKEN").get_value() or "",
     project_id=int(EnvVar("DBT_CLOUD_PROJECT_ID").get_value() or "0"),
     environment_id=int(EnvVar("DBT_CLOUD_ENVIRONMENT_ID").get_value() or "0"),
-    job_id=int(EnvVar("DBT_CLOUD_JOB_ID").get_value())
-    if EnvVar("DBT_CLOUD_JOB_ID").get_value()
-    else None,
+    job_id=int(dbt_cloud_job_id) if dbt_cloud_job_id else None,
     run_timeout_seconds=int(
         EnvVar("DBT_CLOUD_RUN_TIMEOUT_SECONDS").get_value() or "1800"
     ),
