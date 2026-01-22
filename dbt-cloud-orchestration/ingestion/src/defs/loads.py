@@ -1,33 +1,36 @@
 import dlt
-from dagster import EnvVar, String
+from dagster import EnvVar
 import os
+import getpass
+from .resources import DatabricksCredentials
 
 
-def get_databricks_credentials() -> dict | None:
-    """Get Databricks connection credentials using environment variables."""
-    host = os.environ.get("DATABRICKS_HOST", "")
-    token = os.environ.get("DATABRICKS_TOKEN", "")
+def get_postgres_connection_string():
+    """Build PostgreSQL connection string from env vars. Uses local Postgres by default."""
+    host = EnvVar("LOCAL_POSTGRES_HOST").get_value() or "localhost"
+    port = EnvVar("LOCAL_POSTGRES_PORT").get_value() or "5432"
+    user = EnvVar("LOCAL_POSTGRES_USER").get_value() or getpass.getuser()
+    password = EnvVar("LOCAL_POSTGRES_PASSWORD").get_value() or ""
+    database = EnvVar("LOCAL_POSTGRES_DATABASE").get_value() or "postgres"
 
-    if not host or not token:
-        print(
-            f"[DEBUG] Missing Databricks credentials: host='{host}', token={'set' if token else 'not set'}"
-        )
-        return None
-
-    credentials = {
-        "server_hostname": host,
-        "access_token": token,
-        "http_path": os.environ.get("DATABRICKS_HTTP_PATH", ""),
-        "catalog": os.environ.get("DATABRICKS_CATALOG", "test"),
-        "schema": os.environ.get("DATABRICKS_SCHEMA", "main"),
-    }
-    print(f"[DEBUG] Databricks credentials configured for host: {host}")
-    return credentials
+    if password:
+        return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    else:
+        return f"postgresql://{user}@{host}:{port}/{database}"
 
 
-def get_pipeline():
-    """Create and return the DLT pipeline."""
-    credentials = get_databricks_credentials()
+def get_supabase_connection_string():
+    """Build Supabase PostgreSQL connection string from env vars."""
+    host = EnvVar("SUPABASE_HOST").get_value() or "aws-1-eu-west-1.pooler.supabase.com"
+    port = EnvVar("SUPABASE_PORT").get_value() or "5432"
+    user = EnvVar("SUPABASE_USER").get_value() or "postgres.optokmygftwwajposhdy"
+    password = EnvVar("SUPABASE_PASSWORD").get_value() or "SupaBigbro14!!"
+    database = EnvVar("SUPABASE_DATABASE").get_value() or "postgres"
+    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+
+
+def get_pipeline(credentials: DatabricksCredentials | None = None):
+    """Create and return the DLT pipeline (Databricks destination)."""
 
     if credentials is None:
         print(
@@ -35,21 +38,42 @@ def get_pipeline():
         )
         return dlt.pipeline(
             pipeline_name="kaizen_wars_ingestion",
-            destination=dlt.destinations.duckdb(
-                initial_state=False,
-            ),
+            destination=dlt.destinations.duckdb(),
             dataset_name=os.environ.get("DATABRICKS_SCHEMA", "main"),
             dev_mode=True,
         )
 
+    print("[DEBUG] Creating Databricks pipeline")
     return dlt.pipeline(
         pipeline_name="kaizen_wars_ingestion",
         destination=dlt.destinations.databricks(
-            credentials=credentials,
+            credentials=credentials.get_connection_dict(),
+            truncate_tables_on_staging_destination_before_load=False,
         ),
-        dataset_name=os.environ.get("DATABRICKS_SCHEMA", "main"),
+        dataset_name=credentials.schema_name,
         dev_mode=False,
     )
 
 
-pipeline = get_pipeline()
+def get_postgres_pipeline():
+    """Create DLT pipeline with local PostgreSQL destination."""
+    conn_string = get_postgres_connection_string()
+    print(f"[DEBUG] Creating local PostgreSQL pipeline with: {conn_string}")
+    return dlt.pipeline(
+        pipeline_name="csv_to_postgres",
+        destination=dlt.destinations.postgres(conn_string),
+        dataset_name="public",
+        dev_mode=False,
+    )
+
+
+def get_supabase_pipeline():
+    """Create DLT pipeline with Supabase PostgreSQL destination (legacy)."""
+    conn_string = get_supabase_connection_string()
+    print("[DEBUG] Creating Supabase pipeline")
+    return dlt.pipeline(
+        pipeline_name="csv_to_supabase",
+        destination=dlt.destinations.postgres(conn_string),
+        dataset_name="public",
+        dev_mode=False,
+    )

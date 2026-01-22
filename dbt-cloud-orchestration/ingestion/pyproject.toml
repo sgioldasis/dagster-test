@@ -5,9 +5,12 @@ version = "0.1.0"
 dependencies = [
     "dagster>=1.12.8",
     "dagster-dlt>=0.28.8",
-    "dlt[databricks]>=0.4.0",
+    "dagster-databricks>=0.28.0",
+    "dlt[databricks,postgres]>=0.4.0",
     "pandas>=2.3.3",
     "pyarrow>=14.0.0",
+    "psycopg2-binary>=2.9.9",
+    "requests>=2.31.0",
 ]
 
 [dependency-groups]
