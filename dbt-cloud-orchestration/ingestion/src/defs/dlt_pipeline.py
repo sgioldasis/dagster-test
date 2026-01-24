@@ -3,32 +3,11 @@
 
 import dlt
 import pandas as pd
-import getpass
 from dagster import EnvVar
+from dlt.sources.sql_database import sql_database
 
 
-def get_postgres_connection_string():
-    """Build PostgreSQL connection string from env vars. Uses local Postgres by default."""
-    host = EnvVar("LOCAL_POSTGRES_HOST").get_value() or "localhost"
-    port = EnvVar("LOCAL_POSTGRES_PORT").get_value() or "5432"
-    user = EnvVar("LOCAL_POSTGRES_USER").get_value() or getpass.getuser()
-    password = EnvVar("LOCAL_POSTGRES_PASSWORD").get_value() or ""
-    database = EnvVar("LOCAL_POSTGRES_DATABASE").get_value() or "postgres"
-
-    if password:
-        return f"postgresql://{user}:{password}@{host}:{port}/{database}"
-    else:
-        return f"postgresql://{user}@{host}:{port}/{database}"
-
-
-def get_supabase_connection_string():
-    """Build Supabase PostgreSQL connection string from env vars."""
-    host = EnvVar("SUPABASE_HOST").get_value() or "aws-1-eu-west-1.pooler.supabase.com"
-    port = EnvVar("SUPABASE_PORT").get_value() or "5432"
-    user = EnvVar("SUPABASE_USER").get_value() or "postgres.optokmygftwwajposhdy"
-    password = EnvVar("SUPABASE_PASSWORD").get_value() or "SupaBigbro14!!"
-    database = EnvVar("SUPABASE_DATABASE").get_value() or "postgres"
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+from .utils import get_postgres_connection_string, get_supabase_connection_string
 
 
 @dlt.resource(
@@ -53,52 +32,19 @@ def fact_virtual_csv_resource():
         raise FileNotFoundError(f"CSV file not found at: {data_path}") from e
 
 
-@dlt.resource(
-    name="fact_virtual",
-    write_disposition="replace",
-)
-def postgres_resource(table_name: str = "fact_virtual"):
-    """Load all data from PostgreSQL (full reload every run)."""
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-
-    conn_string = get_postgres_connection_string()
-
-    try:
-        conn = psycopg2.connect(conn_string)
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(f"SELECT * FROM {table_name}")
-            for row in cursor:
-                yield dict(row)
-        conn.close()
-    except Exception as e:
-        print(f"[DEBUG] Error reading from PostgreSQL: {e}")
-        yield from []
-
-
-def supabase_postgres_resource(table_name: str = "fact_virtual"):
-    """Load data from Supabase PostgreSQL (legacy - kept for reference)."""
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-
-    conn_string = get_supabase_connection_string()
-
-    try:
-        conn = psycopg2.connect(conn_string)
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(f"SELECT * FROM {table_name}")
-            for row in cursor:
-                yield dict(row)
-        conn.close()
-    except Exception as e:
-        print(f"[DEBUG] Error reading from Supabase: {e}")
-        yield from []
-
-
 @dlt.source(name="postgres")
 def postgres_source():
-    """DLT source: PostgreSQL (local or Supabase) → Databricks."""
-    yield postgres_resource
+    """DLT source for PostgreSQL using the native sql_database source."""
+    conn_string = get_postgres_connection_string()
+    
+    # Be explicit about the table name to ensure it's found
+    source = sql_database(conn_string, table_names=["fact_virtual"])
+    
+    # FORCE 'replace' mode
+    if "fact_virtual" in source.resources:
+        source.fact_virtual.apply_hints(write_disposition="replace")
+        
+    return source
 
 
 @dlt.source(name="csv_to_postgres")
@@ -107,6 +53,13 @@ def csv_to_postgres_source():
     yield fact_virtual_csv_resource
 
 
+@dlt.source(name="supabase")
 def supabase_source():
-    """DLT source: Supabase PostgreSQL → Databricks (legacy)."""
-    yield supabase_postgres_resource
+    """DLT source for Supabase PostgreSQL using the native sql_database source (legacy)."""
+    conn_string = get_supabase_connection_string()
+    
+    source = sql_database(conn_string, table_names=["fact_virtual"])
+    if "fact_virtual" in source.resources:
+        source.fact_virtual.apply_hints(write_disposition="replace")
+        
+    return source

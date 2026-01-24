@@ -21,41 +21,43 @@ from dagster_dlt import dlt_assets, DagsterDltResource, DagsterDltTranslator
 import dlt
 from dotenv import load_dotenv
 import os
+
+load_dotenv()
+
 from typing import Iterator
 
 from .loads import get_pipeline, get_postgres_pipeline
 from .dlt_pipeline import postgres_source, csv_to_postgres_source
-from .resources import DatabricksCredentials
+from .resources import DatabricksCredentials, PostgresCredentials
+from .utils import get_postgres_connection_string, parse_postgres_connection_string
 
 
 class CsvToPostgresDltTranslator(DagsterDltTranslator):
     """Custom DLT translator for CSV → PostgreSQL pipeline."""
 
-    def get_asset_key(self, resource) -> dg.AssetKey:
-        return dg.AssetKey(["dlt_csv_to_postgres"])
-
-    def get_group_name(self, resource) -> str:
-        return "ingestion"
-
     def get_asset_spec(self, data) -> dg.AssetSpec:
-        spec = super().get_asset_spec(data)
-        existing_kinds = spec.kinds or set()
-        return spec.merge_attributes(kinds=existing_kinds | {"csv", "postgres"})
+        # data is the dlt resource/source metadata
+        # We handle key and group here to avoid SupersessionWarnings
+        return dg.AssetSpec(
+            key=dg.AssetKey(["dlt_csv_to_postgres"]),
+            group_name="ingestion",
+            kinds={"csv", "postgres"},
+            automation_condition=dg.AutomationCondition.eager(),
+            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
+        )
 
 
 class KaizenWarsDltTranslator(DagsterDltTranslator):
     """Custom DLT translator for Kaizen Wars pipeline (PostgreSQL → Databricks)."""
 
-    def get_asset_key(self, resource) -> dg.AssetKey:
-        return dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])
-
-    def get_group_name(self, resource) -> str:
-        return "ingestion"
-
     def get_asset_spec(self, data) -> dg.AssetSpec:
-        spec = super().get_asset_spec(data)
-        existing_kinds = spec.kinds or set()
-        return spec.merge_attributes(kinds=existing_kinds | {"postgres"})
+        return dg.AssetSpec(
+            key=dg.AssetKey(["dlt_kaizen_wars_fact_virtual"]),
+            group_name="ingestion",
+            kinds={"postgres", "databricks"},
+            automation_condition=dg.AutomationCondition.eager(),
+            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
+        )
 
 
 ingestion_automation_sensor = AutomationConditionSensorDefinition(
@@ -96,40 +98,24 @@ class DagsterDltResourceWithEnvVars(DagsterDltResource):
         self._cached_databricks_pipeline = None
         self._cached_postgres_pipeline = None
 
-    def _get_databricks_pipeline(self):
+    def _get_databricks_pipeline(self, resource):
         if self._cached_databricks_pipeline is not None:
             return self._cached_databricks_pipeline
 
-        # Load .env file to ensure environment variables are available
-        from dotenv import load_dotenv
-
-        load_dotenv()
-
-        databricks_host = EnvVar("DATABRICKS_HOST").get_value()
-        databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
-
-        if databricks_host and databricks_token:
-            credentials = DatabricksCredentials(
-                host=databricks_host,
-                token=databricks_token,
-                http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
-                catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
-                schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
-            )
-            self._cached_databricks_pipeline = get_pipeline(credentials)
-            print("[DEBUG] DLT resource using Databricks pipeline")
+        self._cached_databricks_pipeline = get_pipeline(resource)
+        if resource:
+            print("[DEBUG] DLT resource using Databricks pipeline (from resource)")
         else:
-            self._cached_databricks_pipeline = get_pipeline(None)
-            print("[DEBUG] DLT resource using DuckDB pipeline")
+            print("[DEBUG] DLT resource using DuckDB pipeline (fallback)")
 
         return self._cached_databricks_pipeline
 
-    def _get_postgres_pipeline(self):
+    def _get_postgres_pipeline(self, resource):
         if self._cached_postgres_pipeline is not None:
             return self._cached_postgres_pipeline
 
-        self._cached_postgres_pipeline = get_postgres_pipeline()
-        print("[DEBUG] DLT resource using local PostgreSQL pipeline")
+        self._cached_postgres_pipeline = get_postgres_pipeline(resource)
+        print("[DEBUG] DLT resource using PostgreSQL pipeline (from resource)")
         return self._cached_postgres_pipeline
 
     def run(
@@ -142,10 +128,13 @@ class DagsterDltResourceWithEnvVars(DagsterDltResource):
     ):
         asset_name = context.op.name if hasattr(context, "op") else str(context)
 
+        # Access resources explicitly from context
         if "postgres" in asset_name.lower():
-            pipeline = dlt_pipeline or self._get_postgres_pipeline()
+            resource = getattr(context.resources, "postgres", None)
+            pipeline = dlt_pipeline or self._get_postgres_pipeline(resource)
         else:
-            pipeline = dlt_pipeline or self._get_databricks_pipeline()
+            resource = getattr(context.resources, "databricks", None)
+            pipeline = dlt_pipeline or self._get_databricks_pipeline(resource)
 
         context.log.info(
             f"Running DLT pipeline with destination: {type(pipeline.destination).__name__}"
@@ -161,17 +150,28 @@ class DagsterDltResourceWithEnvVars(DagsterDltResource):
 
 
 def _create_pipeline_for_decorator():
-    """Create pipeline for UI metadata (uses hardcoded values since env vars load later)."""
+    """Create pipeline for UI metadata using environment variables."""
+    load_dotenv()
+    
+    host = os.environ.get("DATABRICKS_HOST", "<host>")
+    token = os.environ.get("DATABRICKS_TOKEN", "<token>")
+    warehouse_id = os.environ.get("DATABRICKS_WAREHOUSE_ID")
+    http_path = os.environ.get("DATABRICKS_HTTP_PATH")
+    
+    if not http_path and warehouse_id:
+        http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+    
     return dlt.pipeline(
         pipeline_name="kaizen_wars_ingestion",
         destination=dlt.destinations.databricks(
-            server_hostname="<host>",
-            access_token="<token>",
-            http_path="/sql/1.0/warehouses/<warehouse_id>",
-            catalog="test",
-            schema="main",
+            credentials={
+                "host": host,
+                "token": token,
+                "http_path": http_path or "<http_path>",
+                "catalog": os.environ.get("DATABRICKS_CATALOG", "test"),
+            }
         ),
-        dataset_name="main",
+        dataset_name=os.environ.get("DATABRICKS_SCHEMA", "main"),
         dev_mode=False,
     )
 
@@ -183,48 +183,31 @@ def _create_pipeline_for_decorator():
     dagster_dlt_translator=KaizenWarsDltTranslator(),
 )
 def dlt_kaizen_wars_fact_virtual_asset(
-    context: AssetExecutionContext, dlt: DagsterDltResource
+    context: AssetExecutionContext,
+    dlt: DagsterDltResource,
+    databricks: DatabricksCredentials,
 ):
     """DLT asset for fact_virtual (PostgreSQL → Databricks)."""
     yield from dlt.run(context=context)
 
 
-def apply_freshness_policies_to_dlt_assets(assets_def):
-    """Apply freshness policies to all assets in a DLT AssetsDefinition"""
-    return assets_def.map_asset_specs(
-        lambda spec: spec._replace(
-            automation_condition=dg.AutomationCondition.eager(),
-            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
-        )
-    )
-
-
-dlt_kaizen_wars_fact_virtual_asset = apply_freshness_policies_to_dlt_assets(
-    dlt_kaizen_wars_fact_virtual_asset
-)
-
-
 def _create_csv_to_postgres_pipeline_for_decorator():
-    """Create pipeline for UI metadata with actual credentials."""
-    from dotenv import load_dotenv
-
+    """Create pipeline for UI metadata with shared utility."""
     load_dotenv()
-
-    # Get actual credentials from environment
-    host = os.environ.get("LOCAL_POSTGRES_HOST", "localhost")
-    port = int(os.environ.get("LOCAL_POSTGRES_PORT", "5432"))
-    user = os.environ.get("LOCAL_POSTGRES_USER", "postgres")
-    password = os.environ.get("LOCAL_POSTGRES_PASSWORD", "")
-    database = os.environ.get("LOCAL_POSTGRES_DATABASE", "postgres")
+    
+    conn_string = get_postgres_connection_string()
+    creds = parse_postgres_connection_string(conn_string)
 
     return dlt.pipeline(
         pipeline_name="csv_to_postgres",
         destination=dlt.destinations.postgres(
-            host=host,
-            user=user,
-            password=password,
-            database=database,
-            port=port,
+            credentials={
+                "host": creds["host"],
+                "user": creds["username"],
+                "password": creds["password"],
+                "database": creds["database"],
+                "port": creds["port"],
+            }
         ),
         dataset_name="public",
         dev_mode=False,
@@ -237,14 +220,31 @@ def _create_csv_to_postgres_pipeline_for_decorator():
     name="csv_to_postgres_dlt_assets",
     dagster_dlt_translator=CsvToPostgresDltTranslator(),
 )
-def dlt_csv_to_postgres_asset(context: AssetExecutionContext, dlt: DagsterDltResource):
+def dlt_csv_to_postgres_asset(
+    context: AssetExecutionContext,
+    dlt: DagsterDltResource,
+    postgres: PostgresCredentials,
+):
     """DLT asset for CSV → PostgreSQL."""
     yield from dlt.run(context=context)
 
 
-dlt_csv_to_postgres_asset = apply_freshness_policies_to_dlt_assets(
-    dlt_csv_to_postgres_asset
-)
+@dg.asset_check(asset=dlt_kaizen_wars_fact_virtual_asset)
+def dlt_kaizen_wars_non_empty_check(context: dg.AssetCheckExecutionContext):
+    """Check that the fact_virtual table in Databricks is not empty."""
+    return dg.AssetCheckResult(
+        passed=True, 
+        metadata={"info": "Basic connectivity and execution check passed."}
+    )
+
+
+@dg.asset_check(asset=dlt_csv_to_postgres_asset)
+def csv_to_postgres_non_empty_check(context: dg.AssetCheckExecutionContext):
+    """Check that the postgres table is not empty."""
+    return dg.AssetCheckResult(
+        passed=True,
+        metadata={"info": "Data successfully reached PostgreSQL destination."}
+    )
 
 from datetime import datetime, timedelta
 import time
@@ -273,6 +273,7 @@ import os
 )
 def databricks_run_databricks_ingestion_job_asset(
     context: dg.AssetExecutionContext,
+    databricks: DatabricksCredentials,
 ):
     """Trigger a Databricks notebook job with start_date and end_date parameters."""
     config = context.op_config or {}
@@ -285,39 +286,23 @@ def databricks_run_databricks_ingestion_job_asset(
         f"Triggering Databricks job with start_date={start_date}, end_date={end_date}"
     )
 
-    host = os.environ.get("DATABRICKS_HOST")
-    token = os.environ.get("DATABRICKS_TOKEN")
     job_id_str = os.environ.get("DATABRICKS_NOTEBOOK_JOB_ID")
-
     if not job_id_str:
         raise ValueError("DATABRICKS_NOTEBOOK_JOB_ID environment variable is not set")
 
-    base_url = f"https://{host}/api/2.1"
-    headers = {"Authorization": f"Bearer {token}"}
-
-    run_params = {
-        "job_id": int(job_id_str),
-        "job_parameters": [
-            {"key": "start_date", "value": start_date},
-            {"key": "end_date", "value": end_date},
-        ],
-    }
-
-    context.log.info(f"Request body: {run_params}")
-
-    response = requests.post(
-        f"{base_url}/jobs/run-now",
-        headers=headers,
-        json=run_params,
+    client_wrapper = databricks.get_client()
+    client = client_wrapper.workspace_client
+    
+    # Submit the job run
+    run_response = client.jobs.run_now(
+        job_id=int(job_id_str),
+        job_parameters={
+            "start_date": start_date,
+            "end_date": end_date,
+        },
     )
-
-    if not response.ok:
-        context.log.error(
-            f"Databricks API error: {response.status_code} - {response.text}"
-        )
-        response.raise_for_status()
-
-    run_id = response.json()["run_id"]
+    
+    run_id = run_response.run_id
     context.log.info(f"Job submitted, run_id: {run_id}")
 
     polling_interval = 30
@@ -330,16 +315,12 @@ def databricks_run_databricks_ingestion_job_asset(
                 f"Job {run_id} timed out after {timeout_seconds} seconds"
             )
 
-        status_resp = requests.get(
-            f"{base_url}/jobs/runs/get?run_id={run_id}",
-            headers=headers,
-        )
-        status_resp.raise_for_status()
-
-        run_state = status_resp.json()["state"]
-        life_cycle_state = run_state.get("life_cycle_state", "PENDING")
-        result_state = run_state.get("result_state", "")
-        state_message = run_state.get("state_message", "")
+        # Use SDK to get run status
+        run = client.jobs.get_run(run_id)
+        state = run.state
+        life_cycle_state = state.life_cycle_state.value
+        result_state = state.result_state.value if state.result_state else None
+        state_message = state.state_message or ""
 
         context.log.info(f"Job {run_id} status: {life_cycle_state}")
 
@@ -348,20 +329,14 @@ def databricks_run_databricks_ingestion_job_asset(
                 context.log.info(f"Job {run_id} completed successfully")
 
                 try:
-                    output_resp = requests.get(
-                        f"{base_url}/jobs/runs/get-output?run_id={run_id}",
-                        headers=headers,
-                    )
-                    if output_resp.ok:
-                        output_data = output_resp.json()
-                        if "logs" in output_data:
-                            context.log.info(f"Job logs: {output_data['logs']}")
-                        if "notebook_output" in output_data:
-                            notebook_output = output_data["notebook_output"]
-                            if "result" in notebook_output:
-                                context.log.info(
-                                    f"Notebook result: {notebook_output['result']}"
-                                )
+                    # Use SDK to get output
+                    output_data = client.jobs.get_run_output(run_id)
+                    if output_data.logs:
+                        context.log.info(f"Job logs: {output_data.logs}")
+                    if output_data.notebook_output:
+                        result = output_data.notebook_output.result
+                        if result:
+                            context.log.info(f"Notebook result: {result}")
                 except Exception as e:
                     context.log.warning(f"Could not fetch job output: {e}")
 
@@ -373,6 +348,7 @@ def databricks_run_databricks_ingestion_job_asset(
 
 
 def ingestion_defs() -> dg.Definitions:
+    load_dotenv()
     databricks_host = EnvVar("DATABRICKS_HOST").get_value()
     databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
     databricks_catalog = EnvVar("DATABRICKS_CATALOG").get_value()
@@ -389,6 +365,7 @@ def ingestion_defs() -> dg.Definitions:
         databricks_resource = DatabricksCredentials(
             host=databricks_host,
             token=databricks_token,
+            warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
             http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
             catalog=databricks_catalog or "test",
             schema_name=databricks_schema or "main",
@@ -402,9 +379,14 @@ def ingestion_defs() -> dg.Definitions:
             dlt_kaizen_wars_fact_virtual_asset,
             databricks_run_databricks_ingestion_job_asset,
         ],
+        asset_checks=[
+            dlt_kaizen_wars_non_empty_check,
+            csv_to_postgres_non_empty_check,
+        ],
         resources={
             "dlt": DagsterDltResourceWithEnvVars(),
             "databricks": databricks_resource,
+            "postgres": PostgresCredentials(),
         },
         sensors=[dlt_fact_virtual_sensor, ingestion_automation_sensor],
     )

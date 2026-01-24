@@ -1,16 +1,12 @@
-# ingestion/src/ingestion/defs/resources.py
-"""Resources for the ingestion code location."""
-
 import dagster as dg
 from pydantic import Field
+from .utils import get_postgres_connection_string
 
 
 class DatabricksCredentials(dg.ConfigurableResource):
-    """Credentials for connecting to Databricks."""
+    """Credentials for connecting to Databricks, providing both SDK and DLT connection info."""
 
-    host: str = Field(
-        description="Databricks host (e.g.,dbc-xxxxx.cloud.databricks.com)"
-    )
+    host: str = Field(description="Databricks host")
     token: str = Field(description="Databricks access token")
     warehouse_id: str | None = Field(
         default=None, description="Databricks SQL warehouse ID"
@@ -30,6 +26,14 @@ class DatabricksCredentials(dg.ConfigurableResource):
         default=5, description="Maximum concurrent DLT pipeline runs"
     )
 
+    def get_client(self):
+        """Get the Databricks SDK client wrapper."""
+        from dagster_databricks.databricks import DatabricksClient
+        return DatabricksClient(
+            host=self.host,
+            token=self.token,
+        )
+
     def get_connection_dict(self) -> dict:
         """Get connection dictionary for DLT."""
         http_path = self.http_path
@@ -37,11 +41,10 @@ class DatabricksCredentials(dg.ConfigurableResource):
             http_path = f"/sql/1.0/warehouses/{self.warehouse_id}"
 
         return {
-            "server_hostname": self.host,
-            "access_token": self.token,
+            "host": self.host,
+            "token": self.token,
             "http_path": http_path,
             "catalog": self.catalog,
-            "schema": self.schema_name,
         }
 
     def get_pipeline_settings(self) -> dict:
@@ -54,4 +57,22 @@ class DatabricksCredentials(dg.ConfigurableResource):
         return settings
 
 
-__all__ = ["DatabricksCredentials"]
+class PostgresCredentials(dg.ConfigurableResource):
+    """Credentials for connecting to PostgreSQL."""
+
+    host: str | None = Field(default=None)
+    port: str | None = Field(default=None)
+    user: str | None = Field(default=None)
+    password: str | None = Field(default=None)
+    database: str | None = Field(default=None)
+
+    def get_connection_string(self) -> str:
+        """Get PostgreSQL connection string."""
+        if all([self.host, self.user, self.database]):
+            pwd = f":{self.password}" if self.password else ""
+            port = f":{self.port}" if self.port else ""
+            return f"postgresql://{self.user}{pwd}@{self.host}{port}/{self.database}"
+        return get_postgres_connection_string()
+
+
+__all__ = ["DatabricksCredentials", "PostgresCredentials"]

@@ -2,31 +2,10 @@ import dlt
 from dagster import EnvVar
 import os
 import getpass
-from .resources import DatabricksCredentials
+from .resources import DatabricksCredentials, PostgresCredentials
 
 
-def get_postgres_connection_string():
-    """Build PostgreSQL connection string from env vars. Uses local Postgres by default."""
-    host = EnvVar("LOCAL_POSTGRES_HOST").get_value() or "localhost"
-    port = EnvVar("LOCAL_POSTGRES_PORT").get_value() or "5432"
-    user = EnvVar("LOCAL_POSTGRES_USER").get_value() or getpass.getuser()
-    password = EnvVar("LOCAL_POSTGRES_PASSWORD").get_value() or ""
-    database = EnvVar("LOCAL_POSTGRES_DATABASE").get_value() or "postgres"
-
-    if password:
-        return f"postgresql://{user}:{password}@{host}:{port}/{database}"
-    else:
-        return f"postgresql://{user}@{host}:{port}/{database}"
-
-
-def get_supabase_connection_string():
-    """Build Supabase PostgreSQL connection string from env vars."""
-    host = EnvVar("SUPABASE_HOST").get_value() or "aws-1-eu-west-1.pooler.supabase.com"
-    port = EnvVar("SUPABASE_PORT").get_value() or "5432"
-    user = EnvVar("SUPABASE_USER").get_value() or "postgres.optokmygftwwajposhdy"
-    password = EnvVar("SUPABASE_PASSWORD").get_value() or "SupaBigbro14!!"
-    database = EnvVar("SUPABASE_DATABASE").get_value() or "postgres"
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+from .utils import get_postgres_connection_string, get_supabase_connection_string, parse_postgres_connection_string
 
 
 def get_pipeline(credentials: DatabricksCredentials | None = None):
@@ -55,27 +34,20 @@ def get_pipeline(credentials: DatabricksCredentials | None = None):
     )
 
 
-def get_postgres_pipeline():
+def get_postgres_pipeline(credentials: PostgresCredentials | None = None):
     """Create DLT pipeline with local PostgreSQL destination."""
-    from urllib.parse import urlparse
-
-    conn_string = get_postgres_connection_string()
+    if credentials:
+        conn_string = credentials.get_connection_string()
+    else:
+        conn_string = get_postgres_connection_string()
+        
     print(f"[DEBUG] Creating local PostgreSQL pipeline with: {conn_string}")
 
-    # Parse connection string for credentials to pass directly to DLT
-    parsed = urlparse(conn_string)
-
-    credentials = {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "username": parsed.username,
-        "password": parsed.password or "",
-        "database": parsed.path.lstrip("/"),
-    }
+    parsed_creds = parse_postgres_connection_string(conn_string)
 
     return dlt.pipeline(
         pipeline_name="csv_to_postgres",
-        destination=dlt.destinations.postgres(credentials=credentials),
+        destination=dlt.destinations.postgres(credentials=parsed_creds),
         dataset_name="public",
         dev_mode=False,
     )
