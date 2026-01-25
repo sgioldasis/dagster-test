@@ -26,7 +26,12 @@ load_dotenv()
 
 from typing import Iterator
 
-from .defs.loads import get_pipeline, get_postgres_pipeline
+from .defs.loads import (
+    get_pipeline,
+    get_postgres_pipeline,
+    create_databricks_pipeline_from_env,
+    create_postgres_pipeline_from_env,
+)
 from .defs.dlt_pipeline import postgres_source, csv_to_postgres_source
 from .defs.resources import DatabricksCredentials, PostgresCredentials
 from .defs.utils import get_postgres_connection_string, parse_postgres_connection_string
@@ -109,42 +114,16 @@ if databricks_host and databricks_token:
         http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
         catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
         schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+        notebook_job_id=EnvVar("DATABRICKS_NOTEBOOK_JOB_ID").get_value(),
     )
 
 postgres_resource = PostgresCredentials()
 
 
 
-def _create_pipeline_for_decorator():
-    """Create pipeline for UI metadata using environment variables."""
-    load_dotenv()
-    
-    host = os.environ.get("DATABRICKS_HOST", "<host>")
-    token = os.environ.get("DATABRICKS_TOKEN", "<token>")
-    warehouse_id = os.environ.get("DATABRICKS_WAREHOUSE_ID")
-    http_path = os.environ.get("DATABRICKS_HTTP_PATH")
-    
-    if not http_path and warehouse_id:
-        http_path = f"/sql/1.0/warehouses/{warehouse_id}"
-    
-    return dlt.pipeline(
-        pipeline_name="kaizen_wars_ingestion",
-        destination=dlt.destinations.databricks(
-            credentials={
-                "host": host,
-                "token": token,
-                "http_path": http_path or "<http_path>",
-                "catalog": os.environ.get("DATABRICKS_CATALOG", "test"),
-            }
-        ),
-        dataset_name=os.environ.get("DATABRICKS_SCHEMA", "main"),
-        dev_mode=False,
-    )
-
-
 @dlt_assets(
     dlt_source=postgres_source(),
-    dlt_pipeline=_create_pipeline_for_decorator(),
+    dlt_pipeline=create_databricks_pipeline_from_env(),
     dagster_dlt_translator=KaizenWarsDltTranslator(),
 )
 def dlt_kaizen_wars_fact_virtual_asset(
@@ -159,32 +138,9 @@ def dlt_kaizen_wars_fact_virtual_asset(
     yield from dlt.run(context=context, dlt_pipeline=pipeline)
 
 
-def _create_csv_to_postgres_pipeline_for_decorator():
-    """Create pipeline for UI metadata with shared utility."""
-    load_dotenv()
-    
-    conn_string = get_postgres_connection_string()
-    creds = parse_postgres_connection_string(conn_string)
-
-    return dlt.pipeline(
-        pipeline_name="csv_to_postgres",
-        destination=dlt.destinations.postgres(
-            credentials={
-                "host": creds["host"],
-                "user": creds["username"],
-                "password": creds["password"],
-                "database": creds["database"],
-                "port": creds["port"],
-            }
-        ),
-        dataset_name="public",
-        dev_mode=False,
-    )
-
-
 @dlt_assets(
     dlt_source=csv_to_postgres_source(),
-    dlt_pipeline=_create_csv_to_postgres_pipeline_for_decorator(),
+    dlt_pipeline=create_postgres_pipeline_from_env(),
     dagster_dlt_translator=CsvToPostgresDltTranslator(),
 )
 def dlt_csv_to_postgres_asset(
@@ -256,12 +212,13 @@ def databricks_run_databricks_ingestion_job_asset(
         f"Triggering Databricks job with start_date={start_date}, end_date={end_date}"
     )
 
-    job_id_str = os.environ.get("DATABRICKS_NOTEBOOK_JOB_ID")
-    if not job_id_str:
-        raise ValueError("DATABRICKS_NOTEBOOK_JOB_ID environment variable is not set")
-
     if not databricks:
         context.log.warning("No Databricks credentials provided - skipping job trigger")
+        return {"run_id": "skipped", "status": "success"}
+
+    job_id_str = databricks.notebook_job_id
+    if not job_id_str:
+        context.log.warning("No Databricks notebook job ID provided - skipping job trigger")
         return {"run_id": "skipped", "status": "success"}
 
     client_wrapper = databricks.get_client()

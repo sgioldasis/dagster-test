@@ -25,6 +25,9 @@ class DatabricksCredentials(dg.ConfigurableResource):
     write_max_concurrent_runs: int = Field(
         default=5, description="Maximum concurrent DLT pipeline runs"
     )
+    notebook_job_id: str | None = Field(
+        default=None, description="Default Databricks notebook job ID to trigger"
+    )
 
     def get_client(self):
         """Get the Databricks SDK client wrapper."""

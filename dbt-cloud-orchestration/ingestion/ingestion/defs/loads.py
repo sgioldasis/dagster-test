@@ -18,7 +18,7 @@ def get_pipeline(credentials: DatabricksCredentials | None = None):
         return dlt.pipeline(
             pipeline_name="kaizen_wars_ingestion",
             destination=dlt.destinations.duckdb(),
-            dataset_name=os.environ.get("DATABRICKS_SCHEMA", "main"),
+            dataset_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
             dev_mode=True,
         )
 
@@ -50,4 +50,42 @@ def get_postgres_pipeline(credentials: PostgresCredentials | None = None):
         destination=dlt.destinations.postgres(credentials=parsed_creds),
         dataset_name="public",
         dev_mode=False,
+    )
+
+
+def create_databricks_pipeline_from_env():
+    """Create Databricks pipeline using environment variables (for decorators)."""
+    host = EnvVar("DATABRICKS_HOST").get_value() or "<host>"
+    token = EnvVar("DATABRICKS_TOKEN").get_value() or "<token>"
+    warehouse_id = EnvVar("DATABRICKS_WAREHOUSE_ID").get_value()
+    http_path = EnvVar("DATABRICKS_HTTP_PATH").get_value()
+
+    if not http_path and warehouse_id:
+        http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+
+    return dlt.pipeline(
+        pipeline_name="kaizen_wars_ingestion",
+        destination=dlt.destinations.databricks(
+            credentials={
+                "host": host,
+                "token": token,
+                "http_path": http_path or "<http_path>",
+                "catalog": EnvVar("DATABRICKS_CATALOG").get_value() or "test",
+            }
+        ),
+        dataset_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+        dev_mode=True,
+    )
+
+
+def create_postgres_pipeline_from_env():
+    """Create PostgreSQL pipeline using environment variables (for decorators)."""
+    conn_string = get_postgres_connection_string()
+    creds = parse_postgres_connection_string(conn_string)
+
+    return dlt.pipeline(
+        pipeline_name="csv_to_postgres",
+        destination=dlt.destinations.postgres(credentials=creds),
+        dataset_name="public",
+        dev_mode=True,
     )
