@@ -5,7 +5,7 @@ import getpass
 from .resources import DatabricksCredentials, PostgresCredentials
 
 
-from .utils import get_postgres_connection_string, get_supabase_connection_string, parse_postgres_connection_string
+from .utils import get_postgres_connection_string, parse_postgres_connection_string
 
 
 def get_pipeline(credentials: DatabricksCredentials | None = None):
@@ -48,18 +48,6 @@ def get_postgres_pipeline(credentials: PostgresCredentials | None = None):
     return dlt.pipeline(
         pipeline_name="csv_to_postgres",
         destination=dlt.destinations.postgres(credentials=parsed_creds),
-        dataset_name="public",
-        dev_mode=False,
-    )
-
-
-def get_supabase_pipeline():
-    """Create DLT pipeline with Supabase PostgreSQL destination (legacy)."""
-    conn_string = get_supabase_connection_string()
-    print("[DEBUG] Creating Supabase pipeline")
-    return dlt.pipeline(
-        pipeline_name="csv_to_supabase",
-        destination=dlt.destinations.postgres(conn_string),
         dataset_name="public",
         dev_mode=False,
     )

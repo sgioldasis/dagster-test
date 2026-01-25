@@ -17,11 +17,10 @@ tasks:
 
 
   sync-all:
-    desc: "Sync all packages and output PYTHONPATH export command. Usage: task sync-all -- <folder>"
+    desc: "Sync all projects and install all dependencies. Usage: task sync-all -- <folder>"
     dir: "{{.CLI_ARGS}}"
     cmds:
-      - uv sync --all-packages
-      - echo "export PYTHONPATH=\"$(pwd):\$PYTHONPATH\""
+      - uv sync --all-packages --all-groups
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'
         msg: "Error: <folder> argument is required. Example: task sync-all -- dbt-cloud-orchestration"
@@ -41,7 +40,7 @@ tasks:
     desc: "Run Dagster dev server from current folder"
     dir: "{{.USER_WORKING_DIR}}"
     cmds:
-      - 'uv sync --all-packages'
+      - 'uv sync --all-packages --all-groups'
       - 'if [ -f workspace.yaml ]; then dg dev --workspace workspace.yaml; else dg dev; fi'
 
   pg-prepare:

@@ -7,7 +7,7 @@ DLT Databricks pipeline for the Kaizen Wars project.
 ```bash
 cd /home/savas/dagster-test/dbt-cloud-orchestration/ingestion
 uv sync
-PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+dg dev --workspace workspace.yaml
 ```
 
 Open http://localhost:3000 to see the ingestion code location.

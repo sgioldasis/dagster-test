@@ -1,5 +1,5 @@
 load_from:
   - python_module:
-      module_name: "ingestion.src.defs.definitions"
+      module_name: "ingestion.definitions"
       attribute: "ingestion_defs"
       location_name: "ingestion"

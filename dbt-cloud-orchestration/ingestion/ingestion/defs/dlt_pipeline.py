@@ -7,7 +7,7 @@ from dagster import EnvVar
 from dlt.sources.sql_database import sql_database
 
 
-from .utils import get_postgres_connection_string, get_supabase_connection_string
+from .utils import get_postgres_connection_string
 
 
 @dlt.resource(
@@ -49,17 +49,5 @@ def postgres_source():
 
 @dlt.source(name="csv_to_postgres")
 def csv_to_postgres_source():
-    """DLT source: CSV → PostgreSQL (local or Supabase)."""
-    yield fact_virtual_csv_resource
-
-
-@dlt.source(name="supabase")
-def supabase_source():
-    """DLT source for Supabase PostgreSQL using the native sql_database source (legacy)."""
-    conn_string = get_supabase_connection_string()
-    
-    source = sql_database(conn_string, table_names=["fact_virtual"])
-    if "fact_virtual" in source.resources:
-        source.fact_virtual.apply_hints(write_disposition="replace")
-        
-    return source
+    """DLT source: CSV → PostgreSQL."""
+    yield fact_virtual_csv_resource()

@@ -26,10 +26,10 @@ load_dotenv()
 
 from typing import Iterator
 
-from .loads import get_pipeline, get_postgres_pipeline
-from .dlt_pipeline import postgres_source, csv_to_postgres_source
-from .resources import DatabricksCredentials, PostgresCredentials
-from .utils import get_postgres_connection_string, parse_postgres_connection_string
+from .defs.loads import get_pipeline, get_postgres_pipeline
+from .defs.dlt_pipeline import postgres_source, csv_to_postgres_source
+from .defs.resources import DatabricksCredentials, PostgresCredentials
+from .defs.utils import get_postgres_connection_string, parse_postgres_connection_string
 
 
 class CsvToPostgresDltTranslator(DagsterDltTranslator):
@@ -53,6 +53,7 @@ class KaizenWarsDltTranslator(DagsterDltTranslator):
     def get_asset_spec(self, data) -> dg.AssetSpec:
         return dg.AssetSpec(
             key=dg.AssetKey(["dlt_kaizen_wars_fact_virtual"]),
+            deps=[dg.AssetKey(["dlt_csv_to_postgres"])],
             group_name="ingestion",
             kinds={"postgres", "databricks"},
             automation_condition=dg.AutomationCondition.eager(),
@@ -78,75 +79,40 @@ def _is_run_in_progress(context):
     return len(runs) > 0
 
 
-dlt_fact_virtual_sensor = SensorDefinition(
-    name="dlt_fact_virtual_every_2_min",
-    asset_selection=AssetSelection.keys(dg.AssetKey("dlt_kaizen_wars_fact_virtual")),
+csv_ingestion_sensor = SensorDefinition(
+    name="csv_ingestion_every_2_min",
+    asset_selection=AssetSelection.keys(dg.AssetKey("dlt_csv_to_postgres")),
     minimum_interval_seconds=120,
     evaluation_fn=lambda context: (
-        SkipReason("A run is already in progress")
+        SkipReason("An ingestion run is already in progress")
         if _is_run_in_progress(context)
         else RunRequest(partition_key=None)
     ),
 )
 
 
-class DagsterDltResourceWithEnvVars(DagsterDltResource):
-    """Extended DLT resource that routes to correct destination based on asset being run."""
+# Logic for routing DLT pipelines is now handled directly within asset functions
+# to ensure standard Dagster resource resolution.
 
-    def __init__(self):
-        super().__init__()
-        self._cached_databricks_pipeline = None
-        self._cached_postgres_pipeline = None
+dlt_resource = DagsterDltResource()
 
-    def _get_databricks_pipeline(self, resource):
-        if self._cached_databricks_pipeline is not None:
-            return self._cached_databricks_pipeline
+# Top-level resource definitions for static analysis
+databricks_host = EnvVar("DATABRICKS_HOST").get_value()
+databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
 
-        self._cached_databricks_pipeline = get_pipeline(resource)
-        if resource:
-            print("[DEBUG] DLT resource using Databricks pipeline (from resource)")
-        else:
-            print("[DEBUG] DLT resource using DuckDB pipeline (fallback)")
+databricks_resource = None
+if databricks_host and databricks_token:
+    databricks_resource = DatabricksCredentials(
+        host=databricks_host,
+        token=databricks_token,
+        warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
+        http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
+        catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
+        schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+    )
 
-        return self._cached_databricks_pipeline
+postgres_resource = PostgresCredentials()
 
-    def _get_postgres_pipeline(self, resource):
-        if self._cached_postgres_pipeline is not None:
-            return self._cached_postgres_pipeline
-
-        self._cached_postgres_pipeline = get_postgres_pipeline(resource)
-        print("[DEBUG] DLT resource using PostgreSQL pipeline (from resource)")
-        return self._cached_postgres_pipeline
-
-    def run(
-        self,
-        context: dg.OpExecutionContext,
-        dlt_source=None,
-        dlt_pipeline=None,
-        dagster_dlt_translator=None,
-        **kwargs,
-    ):
-        asset_name = context.op.name if hasattr(context, "op") else str(context)
-
-        # Access resources explicitly from context
-        if "postgres" in asset_name.lower():
-            resource = getattr(context.resources, "postgres", None)
-            pipeline = dlt_pipeline or self._get_postgres_pipeline(resource)
-        else:
-            resource = getattr(context.resources, "databricks", None)
-            pipeline = dlt_pipeline or self._get_databricks_pipeline(resource)
-
-        context.log.info(
-            f"Running DLT pipeline with destination: {type(pipeline.destination).__name__}"
-        )
-        yield from DagsterDltResource.run(
-            self,
-            context=context,
-            dlt_pipeline=pipeline,
-            dlt_source=dlt_source,
-            dagster_dlt_translator=dagster_dlt_translator,
-            **kwargs,
-        )
 
 
 def _create_pipeline_for_decorator():
@@ -179,16 +145,18 @@ def _create_pipeline_for_decorator():
 @dlt_assets(
     dlt_source=postgres_source(),
     dlt_pipeline=_create_pipeline_for_decorator(),
-    name="kaizen_wars_dlt_assets",
     dagster_dlt_translator=KaizenWarsDltTranslator(),
 )
 def dlt_kaizen_wars_fact_virtual_asset(
     context: AssetExecutionContext,
-    dlt: DagsterDltResource,
-    databricks: DatabricksCredentials,
+    dlt: dg.ResourceParam[DagsterDltResource],
+    databricks: dg.ResourceParam[DatabricksCredentials],
 ):
     """DLT asset for fact_virtual (PostgreSQL → Databricks)."""
-    yield from dlt.run(context=context)
+    # Build pipeline with Databricks credentials from injected resource
+    pipeline = get_pipeline(databricks)
+    
+    yield from dlt.run(context=context, dlt_pipeline=pipeline)
 
 
 def _create_csv_to_postgres_pipeline_for_decorator():
@@ -217,16 +185,18 @@ def _create_csv_to_postgres_pipeline_for_decorator():
 @dlt_assets(
     dlt_source=csv_to_postgres_source(),
     dlt_pipeline=_create_csv_to_postgres_pipeline_for_decorator(),
-    name="csv_to_postgres_dlt_assets",
     dagster_dlt_translator=CsvToPostgresDltTranslator(),
 )
 def dlt_csv_to_postgres_asset(
     context: AssetExecutionContext,
-    dlt: DagsterDltResource,
-    postgres: PostgresCredentials,
+    dlt: dg.ResourceParam[DagsterDltResource],
+    postgres: dg.ResourceParam[PostgresCredentials],
 ):
     """DLT asset for CSV → PostgreSQL."""
-    yield from dlt.run(context=context)
+    # Build pipeline with Postgres credentials from injected resource
+    pipeline = get_postgres_pipeline(postgres)
+    
+    yield from dlt.run(context=context, dlt_pipeline=pipeline)
 
 
 @dg.asset_check(asset=dlt_kaizen_wars_fact_virtual_asset)
@@ -273,7 +243,7 @@ import os
 )
 def databricks_run_databricks_ingestion_job_asset(
     context: dg.AssetExecutionContext,
-    databricks: DatabricksCredentials,
+    databricks: dg.ResourceParam[DatabricksCredentials],
 ):
     """Trigger a Databricks notebook job with start_date and end_date parameters."""
     config = context.op_config or {}
@@ -289,6 +259,10 @@ def databricks_run_databricks_ingestion_job_asset(
     job_id_str = os.environ.get("DATABRICKS_NOTEBOOK_JOB_ID")
     if not job_id_str:
         raise ValueError("DATABRICKS_NOTEBOOK_JOB_ID environment variable is not set")
+
+    if not databricks:
+        context.log.warning("No Databricks credentials provided - skipping job trigger")
+        return {"run_id": "skipped", "status": "success"}
 
     client_wrapper = databricks.get_client()
     client = client_wrapper.workspace_client
@@ -347,46 +321,27 @@ def databricks_run_databricks_ingestion_job_asset(
         time.sleep(polling_interval)
 
 
+# Final Definitions object at module level for reliable loading
+defs = Definitions(
+    assets=[
+        dlt_csv_to_postgres_asset,
+        dlt_kaizen_wars_fact_virtual_asset,
+        databricks_run_databricks_ingestion_job_asset,
+    ],
+    asset_checks=[
+        dlt_kaizen_wars_non_empty_check,
+        csv_to_postgres_non_empty_check,
+    ],
+    resources={
+        "dlt": dlt_resource,
+        "databricks": databricks_resource or dg.ResourceDefinition.none_resource(),
+        "postgres": postgres_resource,
+    },
+    sensors=[csv_ingestion_sensor, ingestion_automation_sensor],
+)
+
+
 def ingestion_defs() -> dg.Definitions:
-    load_dotenv()
-    databricks_host = EnvVar("DATABRICKS_HOST").get_value()
-    databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
-    databricks_catalog = EnvVar("DATABRICKS_CATALOG").get_value()
-    databricks_schema = EnvVar("DATABRICKS_SCHEMA").get_value()
+    """Wrapper function for tools that expect a function attribute."""
+    return defs
 
-    print(f"[DEBUG] DATABRICKS_HOST='{databricks_host}'")
-    print(f"[DEBUG] DATABRICKS_TOKEN present={bool(databricks_token)}")
-    print(f"[DEBUG] DATABRICKS_CATALOG='{databricks_catalog}'")
-    print(f"[DEBUG] DATABRICKS_SCHEMA='{databricks_schema}'")
-
-    databricks_resource = None
-    if databricks_host and databricks_token:
-        print("[DEBUG] Creating Databricks resource")
-        databricks_resource = DatabricksCredentials(
-            host=databricks_host,
-            token=databricks_token,
-            warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
-            http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
-            catalog=databricks_catalog or "test",
-            schema_name=databricks_schema or "main",
-        )
-    else:
-        print("[DEBUG] No Databricks credentials - using DuckDB fallback")
-
-    return Definitions(
-        assets=[
-            dlt_csv_to_postgres_asset,
-            dlt_kaizen_wars_fact_virtual_asset,
-            databricks_run_databricks_ingestion_job_asset,
-        ],
-        asset_checks=[
-            dlt_kaizen_wars_non_empty_check,
-            csv_to_postgres_non_empty_check,
-        ],
-        resources={
-            "dlt": DagsterDltResourceWithEnvVars(),
-            "databricks": databricks_resource,
-            "postgres": PostgresCredentials(),
-        },
-        sensors=[dlt_fact_virtual_sensor, ingestion_automation_sensor],
-    )

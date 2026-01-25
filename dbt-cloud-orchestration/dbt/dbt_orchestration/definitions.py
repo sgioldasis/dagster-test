@@ -2,9 +2,12 @@
 
 import dagster as dg
 from dagster import AutomationConditionSensorDefinition, EnvVar, SourceAsset
+from dotenv import load_dotenv
 
-from .assets import create_dbt_cloud_definitions
-from .resources import DbtCloudCredentials, DbtCloudRunConfig
+load_dotenv()
+
+from .defs.assets import create_dbt_cloud_definitions
+from .defs.resources import DbtCloudCredentials, DbtCloudRunConfig
 
 
 automation_sensor = AutomationConditionSensorDefinition(
@@ -40,23 +43,28 @@ dlt_kaizen_wars_fact_virtual_source = SourceAsset(
 )
 
 
-def dbt_defs() -> dg.Definitions:
-    (
-        my_dbt_cloud_assets,
-        dbt_cloud_polling_sensor,
-        workspace,
-        dbt_cloud_job_trigger,
-        kaizen_wars_assets,
-    ) = create_dbt_cloud_definitions(dbt_cloud_credentials, dbt_cloud_run_config)
+# Declare assets and resources at module level for static analysis
+(
+    my_dbt_cloud_assets,
+    dbt_cloud_polling_sensor,
+    workspace,
+    dbt_cloud_job_trigger,
+    kaizen_wars_assets,
+) = create_dbt_cloud_definitions(dbt_cloud_credentials, dbt_cloud_run_config)
 
-    return dg.Definitions(
-        assets=[
-            my_dbt_cloud_assets,
-            *kaizen_wars_assets,
-            dlt_kaizen_wars_fact_virtual_source,
-        ],
-        sensors=[dbt_cloud_polling_sensor, automation_sensor],
-        resources={
-            "dbt_cloud": workspace,
-        },
-    )
+defs = dg.Definitions(
+    assets=[
+        my_dbt_cloud_assets,
+        *kaizen_wars_assets,
+        dlt_kaizen_wars_fact_virtual_source,
+    ],
+    sensors=[dbt_cloud_polling_sensor, automation_sensor],
+    resources={
+        "dbt_cloud": workspace,
+    },
+)
+
+
+def dbt_defs() -> dg.Definitions:
+    """Wrapper function for tools that expect a function attribute."""
+    return defs

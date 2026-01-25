@@ -2,8 +2,11 @@
 
 import dagster as dg
 from dagster import EnvVar, SourceAsset
+from dotenv import load_dotenv
 
-from .fact_virtual_count import (
+load_dotenv()
+
+from .defs.fact_virtual_count import (
     fact_virtual_count_asset,
 )
 
@@ -14,10 +17,14 @@ stg_kaizen_wars_fact_virtual_source = SourceAsset(
 )
 
 
+defs = dg.Definitions(
+    assets=[
+        fact_virtual_count_asset,
+        stg_kaizen_wars_fact_virtual_source,
+    ],
+)
+
+
 def downstream_defs() -> dg.Definitions:
-    return dg.Definitions(
-        assets=[
-            fact_virtual_count_asset,
-            stg_kaizen_wars_fact_virtual_source,
-        ],
-    )
+    """Wrapper function for tools that expect a function attribute."""
+    return defs

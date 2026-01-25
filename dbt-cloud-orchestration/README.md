@@ -9,9 +9,8 @@ A Dagster + dbt Cloud orchestration monorepo with three independent code locatio
 From the monorepo root:
 
 ```bash
-cd /home/savas/dagster-test/dbt-cloud-orchestration
-uv sync --all-packages
-PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+uv sync --all-packages --all-groups
+dg dev --workspace workspace.yaml
 ```
 
 Open http://localhost:3000 in your browser.
@@ -22,49 +21,41 @@ Each sub-project can be developed independently:
 
 ```bash
 # Ingestion team
-cd /home/savas/dagster-test/dbt-cloud-orchestration/ingestion
-uv sync
-PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+cd ingestion/
+dg dev
 
 # DBT team
-cd /home/savas/dagster-test/dbt-cloud-orchestration/dbt
-uv sync
-PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+cd dbt/
+dg dev
 
 # Downstream team
-cd /home/savas/dagster-test/dbt-cloud-orchestration/downstream
-uv sync
-PYTHONPATH=/home/savas/dagster-test/dbt-cloud-orchestration:$PYTHONPATH dg dev --workspace workspace.yaml
+cd downstream/
+dg dev
 ```
 
 ## Project Structure
 
 ```
-dbt-cloud-orchestration/
-├── workspace.yaml              # Loads all 3 code locations
-├── pyproject.toml              # Root workspace (uv workspace)
-├── uv.lock                     # Shared lockfile
-├── data/                       # Source data files
-│   ├── raw_fact_virtual.csv
-│   ├── raw_customers.csv
-│   ├── raw_orders.csv
-│   └── raw_payments.csv
-├── ingestion/                  # Team 1: DLT pipeline
-│   ├── pyproject.toml
-│   ├── src/
-│   │   └── defs/
-│   │       └── definitions.py
-│   └── .env                    # Environment variables
-├── dbt/                        # Team 2: dbt Cloud
-│   ├── pyproject.toml
-│   └── src/
-│       └── defs/
-│           └── definitions.py
-└── downstream/                 # Team 3: Downstream
-    ├── pyproject.toml
-    └── src/
-        └── defs/
-            └── definitions.py
+dbt-cloud-orchestration/                       # Monorepo Root
+├── workspace.yaml                             # Loads all 3 code locations
+├── pyproject.toml                             # Root workspace configuration
+├── uv.lock                                    # Shared workspace lockfile
+├── data/                                      # Shared source data files
+├── ingestion/                                 # Team 1: DLT pipeline project
+│   ├── ingestion/                             # Python package
+│   │   ├── definitions.py                     # Entry point
+│   │   └── defs/                              # Supporting components
+│   └── workspace.yaml
+├── dbt/                                       # Team 2: dbt Cloud orchestration
+│   ├── dbt_orchestration/                     # Python package (renamed to avoid collisions)
+│   │   ├── definitions.py                     # Entry point
+│   │   └── defs/                              # Supporting components
+│   └── workspace.yaml
+└── downstream/                                # Team 3: Downstream processing
+    ├── downstream/                            # Python package
+    │   ├── definitions.py                     # Entry point
+    │   └── defs/                              # Supporting components
+    └── workspace.yaml
 ```
 
 ## Code Locations
@@ -106,12 +97,12 @@ Source data files are in the `data/` directory at the monorepo root:
 
 ## Alias for Convenience
 
-Add to your shell profile (`.bashrc` or `.zshrc`):
+Add to your shell profile (`.bashrc` or `.zshrc`) while in the monorepo root:
 
 ```bash
-export MONOREPO_ROOT=/home/savas/dagster-test/dbt-cloud-orchestration
-alias dg-all='PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace $MONOREPO_ROOT/workspace.yaml'
-alias dg-ing='cd $MONOREPO_ROOT/ingestion && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
-alias dg-dbt='cd $MONOREPO_ROOT/dbt && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
-alias dg-down='cd $MONOREPO_ROOT/downstream && PYTHONPATH=$MONOREPO_ROOT:$PYTHONPATH dg dev --workspace workspace.yaml'
+export MONOREPO_ROOT=$(pwd)
+alias dg-all='dg dev --workspace $MONOREPO_ROOT/workspace.yaml'
+alias dg-ing='cd $MONOREPO_ROOT/ingestion && dg dev'
+alias dg-dbt='cd $MONOREPO_ROOT/dbt && dg dev'
+alias dg-down='cd $MONOREPO_ROOT/downstream && dg dev'
 ```
