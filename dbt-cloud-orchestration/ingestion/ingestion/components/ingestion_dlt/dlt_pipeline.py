@@ -14,6 +14,8 @@ import dlt
 import pandas as pd
 from dlt.common.typing import TDataItem
 
+from dagster import EnvVar
+
 
 @dlt.resource(name="dlt_fact_virtual", write_disposition="replace")
 def raw_fact_virtual_csv() -> Iterator[TDataItem]:
@@ -25,8 +27,10 @@ def raw_fact_virtual_csv() -> Iterator[TDataItem]:
     Yields:
         Dictionary records from the CSV file.
     """
-    # Use absolute path to the CSV file
-    csv_path = Path("/home/savas/dagster-test/dbt-cloud-orchestration/data/raw_fact_virtual.csv")
+    csv_data_path = EnvVar("CSV_DATA_PATH").get_value()
+    if csv_data_path is None:
+        raise ValueError("CSV_DATA_PATH environment variable is not set")
+    csv_path = Path(csv_data_path) / "raw_fact_virtual.csv"
     df = pd.read_csv(csv_path)
     yield from df.to_dict(orient="records")
 

@@ -83,8 +83,8 @@ export DATABRICKS_HOST=...
 export DATABRICKS_TOKEN=...
 export DATABRICKS_WAREHOUSE_ID=...
 
-# Data files (relative to sub-project directory)
-export FACT_VIRTUAL_DATA_PATH=../data/raw_fact_virtual.csv
+# CSV Data directory (absolute path required for both DLT and Sling ingestion)
+export CSV_DATA_PATH=/path/to/your/dbt-cloud-orchestration/data
 ```
 
 ## Data
