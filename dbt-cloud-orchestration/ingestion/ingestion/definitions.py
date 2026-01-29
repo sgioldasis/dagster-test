@@ -1,79 +1,92 @@
-"""Ingestion code location - DLT pipeline for loading data."""
+"""Dagster Definitions for the Ingestion code location.
+
+This module defines all Dagster assets, resources, sensors, and checks for the
+ingestion pipeline. It uses a hybrid approach:
+
+1. Component-based Sling assets (from YAML configuration)
+2. Programmatic Databricks orchestration asset
+
+Key Concepts:
+- Sling: A data movement tool that syncs data between sources and targets
+- Dagster Components: YAML-first configuration for common patterns
+- Freshness Checks: Monitor data freshness and alert on stale data
+- Automation: Eager execution when upstream dependencies update
+
+Architecture:
+    CSV files (source)
+         │
+         ▼
+    ┌─────────────────┐
+    │ csv_fact_virtual│  (Sling: CSV → PostgreSQL)
+    └─────────────────┘
+         │
+         ▼
+    ┌───────────────────────┐
+    │ databricks_fact_virtual│ (Sling: PostgreSQL → Databricks)
+    └───────────────────────┘
+         │
+         ▼
+    ┌──────────────────────────┐
+    │ Databricks Job (optional) │ (Programmatic trigger)
+    └──────────────────────────┘
+"""
+
+from pathlib import Path
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+from databricks.sdk.service.jobs import RunResultState
 
 import dagster as dg
 from dagster import (
-    Definitions,
     AutomationCondition,
     AutomationConditionSensorDefinition,
-    LegacyFreshnessPolicy,
     SensorDefinition,
     RunRequest,
     AssetSelection,
     SkipReason,
     RunsFilter,
-    AssetExecutionContext,
     EnvVar,
-    AssetKey,
     Field,
+    AssetExecutionContext,
+    build_last_update_freshness_checks,
+    AssetKey,
 )
 from dagster._core.storage.dagster_run import DagsterRunStatus
-from dagster_dlt import dlt_assets, DagsterDltResource, DagsterDltTranslator
-import dlt
-from dotenv import load_dotenv
-import os
+from dagster.components import build_component_defs
 
+from ingestion.defs.resources import DatabricksCredentials, PostgresCredentials
+
+# Load environment variables from .env file for local development
 load_dotenv()
 
-from typing import Iterator
-
-from .defs.loads import (
-    get_pipeline,
-    get_postgres_pipeline,
-    create_databricks_pipeline_from_env,
-    create_postgres_pipeline_from_env,
-)
-from .defs.dlt_pipeline import postgres_source, csv_to_postgres_source
-from .defs.resources import DatabricksCredentials, PostgresCredentials
-from .defs.utils import get_postgres_connection_string, parse_postgres_connection_string
-
-
-class CsvToPostgresDltTranslator(DagsterDltTranslator):
-    """Custom DLT translator for CSV → PostgreSQL pipeline."""
-
-    def get_asset_spec(self, data) -> dg.AssetSpec:
-        # data is the dlt resource/source metadata
-        # We handle key and group here to avoid SupersessionWarnings
-        return dg.AssetSpec(
-            key=dg.AssetKey(["dlt_csv_to_postgres"]),
-            group_name="ingestion",
-            kinds={"csv", "postgres"},
-            automation_condition=dg.AutomationCondition.eager(),
-            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
-        )
-
-
-class KaizenWarsDltTranslator(DagsterDltTranslator):
-    """Custom DLT translator for Kaizen Wars pipeline (PostgreSQL → Databricks)."""
-
-    def get_asset_spec(self, data) -> dg.AssetSpec:
-        return dg.AssetSpec(
-            key=dg.AssetKey(["dlt_kaizen_wars_fact_virtual"]),
-            deps=[dg.AssetKey(["dlt_csv_to_postgres"])],
-            group_name="ingestion",
-            kinds={"postgres", "databricks"},
-            automation_condition=dg.AutomationCondition.eager(),
-            legacy_freshness_policy=LegacyFreshnessPolicy(maximum_lag_minutes=1),
-        )
-
+# =============================================================================
+# SENSORS
+# =============================================================================
 
 ingestion_automation_sensor = AutomationConditionSensorDefinition(
     name="default_automation_sensor",
     target=dg.AssetSelection.all(),
-    use_user_code_server=True,
 )
+"""Default automation sensor that triggers assets based on their automation conditions.
+
+This sensor monitors all assets with AutomationCondition.eager() and triggers
+them when their upstream dependencies are updated. It runs continuously and
+checks for materialization events that would satisfy eager conditions.
+"""
 
 
-def _is_run_in_progress(context):
+def _is_run_in_progress(context: dg.SensorEvaluationContext) -> bool:
+    """Check if there's already an ingestion run in progress.
+
+    This prevents multiple concurrent runs of the same pipeline, which could
+    cause resource contention or data consistency issues.
+
+    Args:
+        context: The sensor evaluation context with access to Dagster instance
+
+    Returns:
+        True if there's at least one run in STARTED or QUEUED status
+    """
     instance = context.instance
     runs = instance.get_runs(
         filters=RunsFilter(
@@ -86,7 +99,7 @@ def _is_run_in_progress(context):
 
 csv_ingestion_sensor = SensorDefinition(
     name="csv_ingestion_every_2_min",
-    asset_selection=AssetSelection.keys(dg.AssetKey("dlt_csv_to_postgres")),
+    asset_selection=AssetSelection.assets(dg.AssetKey("csv_fact_virtual")),
     minimum_interval_seconds=120,
     evaluation_fn=lambda context: (
         SkipReason("An ingestion run is already in progress")
@@ -94,114 +107,71 @@ csv_ingestion_sensor = SensorDefinition(
         else RunRequest(partition_key=None)
     ),
 )
+"""Sensor that triggers csv_fact_virtual ingestion every 2 minutes.
+
+This sensor provides an alternative to the automation sensor for periodic
+execution. It includes a safeguard to skip if a run is already in progress.
+
+Note: Currently using AutomationCondition.eager() instead, but this sensor
+remains available for explicit scheduling scenarios.
+"""
 
 
-# Logic for routing DLT pipelines is now handled directly within asset functions
-# to ensure standard Dagster resource resolution.
-
-dlt_resource = DagsterDltResource()
-
-# Top-level resource definitions for static analysis
-databricks_host = EnvVar("DATABRICKS_HOST").get_value()
-databricks_token = EnvVar("DATABRICKS_TOKEN").get_value()
-
-databricks_resource = None
-if databricks_host and databricks_token:
-    databricks_resource = DatabricksCredentials(
-        host=databricks_host,
-        token=databricks_token,
-        warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
-        http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
-        catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
-        schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
-        notebook_job_id=EnvVar("DATABRICKS_NOTEBOOK_JOB_ID").get_value(),
-    )
-
-postgres_resource = PostgresCredentials()
-
-
-
-@dlt_assets(
-    dlt_source=postgres_source(),
-    dlt_pipeline=create_databricks_pipeline_from_env(),
-    dagster_dlt_translator=KaizenWarsDltTranslator(),
-)
-def dlt_kaizen_wars_fact_virtual_asset(
-    context: AssetExecutionContext,
-    dlt: dg.ResourceParam[DagsterDltResource],
-    databricks: dg.ResourceParam[DatabricksCredentials],
-):
-    """DLT asset for fact_virtual (PostgreSQL → Databricks)."""
-    # Build pipeline with Databricks credentials from injected resource
-    pipeline = get_pipeline(databricks)
-    
-    yield from dlt.run(context=context, dlt_pipeline=pipeline)
-
-
-@dlt_assets(
-    dlt_source=csv_to_postgres_source(),
-    dlt_pipeline=create_postgres_pipeline_from_env(),
-    dagster_dlt_translator=CsvToPostgresDltTranslator(),
-)
-def dlt_csv_to_postgres_asset(
-    context: AssetExecutionContext,
-    dlt: dg.ResourceParam[DagsterDltResource],
-    postgres: dg.ResourceParam[PostgresCredentials],
-):
-    """DLT asset for CSV → PostgreSQL."""
-    # Build pipeline with Postgres credentials from injected resource
-    pipeline = get_postgres_pipeline(postgres)
-    
-    yield from dlt.run(context=context, dlt_pipeline=pipeline)
-
-
-@dg.asset_check(asset=dlt_kaizen_wars_fact_virtual_asset)
-def dlt_kaizen_wars_non_empty_check(context: dg.AssetCheckExecutionContext):
-    """Check that the fact_virtual table in Databricks is not empty."""
-    return dg.AssetCheckResult(
-        passed=True, 
-        metadata={"info": "Basic connectivity and execution check passed."}
-    )
-
-
-@dg.asset_check(asset=dlt_csv_to_postgres_asset)
-def csv_to_postgres_non_empty_check(context: dg.AssetCheckExecutionContext):
-    """Check that the postgres table is not empty."""
-    return dg.AssetCheckResult(
-        passed=True,
-        metadata={"info": "Data successfully reached PostgreSQL destination."}
-    )
-
-from datetime import datetime, timedelta
-import time
-import requests
-import os
-
+# =============================================================================
+# ASSETS
+# =============================================================================
 
 @dg.asset(
     key="run_databricks_ingestion_job",
     group_name="ingestion",
     automation_condition=AutomationCondition.eager(),
+    freshness_policy=dg.FreshnessPolicy.time_window(
+        fail_window=timedelta(minutes=5),
+        warn_window=timedelta(minutes=2),
+    ),
     tags={"dagster/icon": "schedule", "databricks": "ingestion"},
     compute_kind="databricks",
     config_schema={
         "start_date": Field(
             str,
             default_value=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-            description="Start date (YYYY-MM-DD)",
+            description="Start date for Databricks job (YYYY-MM-DD format)",
         ),
         "end_date": Field(
             str,
             default_value=datetime.now().strftime("%Y-%m-%d"),
-            description="End date (YYYY-MM-DD)",
+            description="End date for Databricks job (YYYY-MM-DD format)",
         ),
     },
 )
 def databricks_run_databricks_ingestion_job_asset(
-    context: dg.AssetExecutionContext,
+    context: AssetExecutionContext,
     databricks: dg.ResourceParam[DatabricksCredentials],
-):
-    """Trigger a Databricks notebook job with start_date and end_date parameters."""
+) -> dict:
+    """Trigger a Databricks notebook job with configurable date parameters.
+
+    This asset demonstrates how to orchestrate external Databricks jobs from
+    within Dagster. It submits a job run, polls for completion, and returns
+    the execution results.
+
+    Usage:
+        This asset can be triggered manually with specific date ranges:
+        ```
+        dagster asset materialize --select run_databricks_ingestion_job \
+          --config '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
+        ```
+
+    Args:
+        context: Asset execution context for logging and config access
+        databricks: Configured Databricks credentials resource
+
+    Returns:
+        Dictionary with run_id and status of the Databricks job
+
+    Raises:
+        TimeoutError: If the job doesn't complete within 10 minutes
+        RuntimeError: If the job fails or returns an error
+    """
     config = context.op_config or {}
     start_date = config.get("start_date") or (
         datetime.now() - timedelta(days=1)
@@ -212,19 +182,22 @@ def databricks_run_databricks_ingestion_job_asset(
         f"Triggering Databricks job with start_date={start_date}, end_date={end_date}"
     )
 
+    # Skip if no Databricks credentials configured (allows testing without Databricks)
     if not databricks:
         context.log.warning("No Databricks credentials provided - skipping job trigger")
         return {"run_id": "skipped", "status": "success"}
 
     job_id_str = databricks.notebook_job_id
     if not job_id_str:
-        context.log.warning("No Databricks notebook job ID provided - skipping job trigger")
+        context.log.warning(
+            "No Databricks notebook job ID provided - skipping job trigger"
+        )
         return {"run_id": "skipped", "status": "success"}
 
     client_wrapper = databricks.get_client()
     client = client_wrapper.workspace_client
-    
-    # Submit the job run
+
+    # Submit the job run with date parameters
     run_response = client.jobs.run_now(
         job_id=int(job_id_str),
         job_parameters={
@@ -232,73 +205,152 @@ def databricks_run_databricks_ingestion_job_asset(
             "end_date": end_date,
         },
     )
-    
+
     run_id = run_response.run_id
     context.log.info(f"Job submitted, run_id: {run_id}")
 
-    polling_interval = 30
-    timeout_seconds = 600
-    start_time = time.time()
+    # Wait for job completion using SDK's built-in polling
+    run = client.jobs.wait_get_run_job_terminated_or_skipped(
+        run_id=run_id,
+        timeout=timedelta(seconds=600),
+    )
 
-    while True:
-        if time.time() - start_time > timeout_seconds:
-            raise TimeoutError(
-                f"Job {run_id} timed out after {timeout_seconds} seconds"
-            )
+    if run.state.result_state == RunResultState.SUCCESS:
+        context.log.info(f"Job {run_id} completed successfully")
 
-        # Use SDK to get run status
-        run = client.jobs.get_run(run_id)
-        state = run.state
-        life_cycle_state = state.life_cycle_state.value
-        result_state = state.result_state.value if state.result_state else None
-        state_message = state.state_message or ""
+        # Try to fetch and log job output
+        try:
+            output_data = client.jobs.get_run_output(run_id)
+            if output_data.logs:
+                context.log.info(f"Job logs: {output_data.logs}")
+            if output_data.notebook_output:
+                result = output_data.notebook_output.result
+                if result:
+                    context.log.info(f"Notebook result: {result}")
+        except Exception as e:
+            context.log.warning(f"Could not fetch job output: {e}")
 
-        context.log.info(f"Job {run_id} status: {life_cycle_state}")
-
-        if life_cycle_state in ["TERMINATED", "INTERNAL_ERROR", "SKIPPED"]:
-            if result_state == "SUCCESS":
-                context.log.info(f"Job {run_id} completed successfully")
-
-                try:
-                    # Use SDK to get output
-                    output_data = client.jobs.get_run_output(run_id)
-                    if output_data.logs:
-                        context.log.info(f"Job logs: {output_data.logs}")
-                    if output_data.notebook_output:
-                        result = output_data.notebook_output.result
-                        if result:
-                            context.log.info(f"Notebook result: {result}")
-                except Exception as e:
-                    context.log.warning(f"Could not fetch job output: {e}")
-
-                return {"run_id": run_id, "status": "success"}
-            else:
-                raise RuntimeError(f"Job {run_id} failed: {state_message}")
-
-        time.sleep(polling_interval)
+        return {"run_id": run_id, "status": "success"}
+    else:
+        raise RuntimeError(
+            f"Job {run_id} failed: {run.state.state_message or 'Unknown error'}"
+        )
 
 
-# Final Definitions object at module level for reliable loading
-defs = Definitions(
-    assets=[
-        dlt_csv_to_postgres_asset,
-        dlt_kaizen_wars_fact_virtual_asset,
-        databricks_run_databricks_ingestion_job_asset,
-    ],
-    asset_checks=[
-        dlt_kaizen_wars_non_empty_check,
-        csv_to_postgres_non_empty_check,
-    ],
-    resources={
-        "dlt": dlt_resource,
-        "databricks": databricks_resource or dg.ResourceDefinition.none_resource(),
-        "postgres": postgres_resource,
-    },
-    sensors=[csv_ingestion_sensor, ingestion_automation_sensor],
+# =============================================================================
+# FRESHNESS CHECKS
+# =============================================================================
+
+# Freshness checks monitor when assets were last materialized and raise
+# alerts if they exceed the expected update frequency.
+
+csv_fact_virtual_freshness_checks = build_last_update_freshness_checks(
+    assets=[AssetKey("csv_fact_virtual")],
+    lower_bound_delta=timedelta(minutes=1),
+    severity=dg.AssetCheckSeverity.ERROR,
+)
+"""Freshness check for csv_fact_virtual asset.
+
+Fails if the asset hasn't been updated in the last 1 minute.
+This is aggressive for demonstration - in production, use longer windows
+based on your actual data refresh SLAs.
+"""
+
+databricks_fact_virtual_freshness_checks = build_last_update_freshness_checks(
+    assets=[AssetKey("databricks_fact_virtual")],
+    lower_bound_delta=timedelta(minutes=1),
+    severity=dg.AssetCheckSeverity.ERROR,
+)
+"""Freshness check for databricks_fact_virtual asset.
+
+Note: This check is on the Sling-managed asset. The freshness policy
+configured in the component provides additional monitoring with warn/fail
+thresholds.
+"""
+
+# Combine all freshness checks for registration
+all_freshness_checks = (
+    list(csv_fact_virtual_freshness_checks) +
+    list(databricks_fact_virtual_freshness_checks)
 )
 
 
-def ingestion_defs() -> dg.Definitions:
-    """Wrapper function for tools that expect a function attribute."""
-    return defs
+# =============================================================================
+# DEFINITIONS
+# =============================================================================
 
+def get_definitions() -> dg.Definitions:
+    """Build and return the complete Dagster Definitions object.
+
+    This function assembles all components of the ingestion pipeline:
+    1. Component-based Sling assets (from YAML in components/)
+    2. Programmatic Databricks orchestration asset
+    3. Resources for database connections
+    4. Sensors for automation and freshness monitoring
+    5. Freshness checks for data quality
+
+    Returns:
+        Definitions object containing all assets, resources, and sensors
+    """
+    # Configure Databricks resource from environment variables
+    databricks_resource = DatabricksCredentials(
+        host=EnvVar("DATABRICKS_HOST").get_value() or "",
+        token=EnvVar("DATABRICKS_TOKEN").get_value() or "",
+        warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
+        http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
+        catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
+        schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
+        notebook_job_id=EnvVar("DATABRICKS_NOTEBOOK_JOB_ID").get_value(),
+    )
+
+    # Build component definitions from the components/ directory
+    # This discovers and loads all YAML-based components (Sling replications)
+    component_defs = build_component_defs(Path(__file__).parent / "components")
+
+    # Create freshness sensor for visibility in lineage
+    freshness_sensor = dg.build_sensor_for_freshness_checks(
+        name="freshness_sensor",
+        minimum_interval_seconds=30,
+        freshness_checks=all_freshness_checks,
+    )
+
+    # Merge component definitions with programmatic definitions
+    merged_defs = dg.Definitions.merge(
+        component_defs,
+        dg.Definitions(
+            assets=[
+                databricks_run_databricks_ingestion_job_asset,
+            ],
+            asset_checks=all_freshness_checks,
+            resources={
+                "databricks": databricks_resource,
+                "postgres": PostgresCredentials(),
+            },
+            sensors=[
+                csv_ingestion_sensor,
+                ingestion_automation_sensor,
+                freshness_sensor,
+            ],
+        ),
+    )
+
+    # Ensure consistent group name for all assets
+    return merged_defs.map_asset_specs(
+        func=lambda spec: spec.replace_attributes(
+            group_name="ingestion",
+        )
+    )
+
+
+# The global definitions object loaded by Dagster
+defs = get_definitions()
+
+
+def ingestion_defs() -> dg.Definitions:
+    """Wrapper function for tools that expect a function attribute.
+
+    This allows the workspace.yaml to reference either:
+    - ingestion.definitions:defs (the object directly)
+    - ingestion.definitions:ingestion_defs (via this function)
+    """
+    return defs

@@ -1,0 +1,85 @@
+# =============================================================================
+# Ingestion Sling Component Configuration
+# =============================================================================
+#
+# This YAML file configures the IngestionSlingComponent which manages
+# data replication using Sling (https://slingdata.io/).
+#
+# Purpose:
+#   Define database connections and replication specifications for moving
+#   data between CSV files, PostgreSQL, and Databricks.
+#
+# Connection Types:
+#   - file: Local or remote file system (CSV, JSON, etc.)
+#   - postgres: PostgreSQL database
+#   - databricks: Databricks SQL warehouse or cluster
+#
+# Environment Variables:
+#   All sensitive credentials use env: prefix to reference environment variables.
+#   Create a .env file in the project root with these variables:
+#     - POSTGRES_CONNECTION_STRING
+#     - DATABRICKS_HOST
+#     - DATABRICKS_TOKEN
+#     - DATABRICKS_WAREHOUSE_ID
+#     - DATABRICKS_HTTP_PATH (optional)
+#     - DATABRICKS_CATALOG
+#     - DATABRICKS_SCHEMA
+#
+# =============================================================================
+
+type: ingestion.IngestionSlingComponent
+
+attributes:
+  # ==========================================================================
+  # CONNECTIONS
+  # ==========================================================================
+  # Define named connections that can be referenced in replication YAML files.
+  # Each connection must have a unique name and type-specific configuration.
+  # ==========================================================================
+  connections:
+
+    # CSV_SOURCE: File system connection for reading CSV files
+    # Used by: replication_csv.yaml
+    CSV_SOURCE:
+      type: file
+      # No additional config needed for local files
+      # Path to files is specified in the replication stream configuration
+
+    # POSTGRES_DEST: PostgreSQL destination for CSV data
+    # Used by: replication_csv.yaml (as target) and replication_db.yaml (as source)
+    POSTGRES_DEST:
+      type: postgres
+      # Connection string format: postgresql://user:password@host:port/database
+      # Using env: prefix to read from environment variable
+      connection_string: env:POSTGRES_CONNECTION_STRING
+
+    # POSTGRES_TARGET: Alias for PostgreSQL (for clearer naming in replications)
+    # This is the same database as POSTGRES_DEST, just a different reference name
+    POSTGRES_TARGET:
+      type: postgres
+      connection_string: env:POSTGRES_CONNECTION_STRING
+
+    # DATABRICKS_TARGET: Databricks SQL warehouse connection
+    # Used by: replication_db.yaml (as target for PostgreSQL data)
+    DATABRICKS_TARGET:
+      type: databricks
+      host: env:DATABRICKS_HOST              # e.g., adb-xxx.azuredatabricks.net
+      token: env:DATABRICKS_TOKEN            # Personal access token
+      http_path: env:DATABRICKS_HTTP_PATH    # Optional: /sql/1.0/warehouses/xxx
+      warehouse_id: env:DATABRICKS_WAREHOUSE_ID  # Used to auto-construct http_path
+      catalog: env:DATABRICKS_CATALOG        # Unity Catalog name (e.g., "main")
+      schema: env:DATABRICKS_SCHEMA          # Schema within catalog (e.g., "default")
+
+  # ==========================================================================
+  # REPLICATIONS
+  # ==========================================================================
+  # List of replication specification files to execute.
+  # Each file defines one or more data replication streams.
+  # Paths are relative to this component.yaml file.
+  # ==========================================================================
+  replications:
+    # replication_csv.yaml: Loads CSV files into PostgreSQL
+    - path: replication_csv.yaml
+
+    # replication_db.yaml: Replicates PostgreSQL data to Databricks
+    - path: replication_db.yaml

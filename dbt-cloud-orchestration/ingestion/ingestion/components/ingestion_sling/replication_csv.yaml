@@ -1,0 +1,82 @@
+# =============================================================================
+# Sling Replication: CSV to PostgreSQL
+# =============================================================================
+#
+# Purpose:
+#   Load CSV files from the local file system into a PostgreSQL database.
+#   This is the first step in the ingestion pipeline.
+#
+# Pipeline Position:
+#   CSV Files → [THIS REPLICATION] → PostgreSQL
+#
+# Connections:
+#   - Source: CSV_SOURCE (file system - defined in component.yaml)
+#   - Target: POSTGRES_DEST (PostgreSQL database - defined in component.yaml)
+#
+# Mode:
+#   full-refresh: Truncates target table and reloads all data.
+#   Other options: incremental, snapshot, backfill
+#
+# Dagster Integration:
+#   This replication creates a Dagster asset named "csv_fact_virtual".
+#   The asset key is defined in the meta.dagster section below.
+#
+# Reference:
+#   https://docs.slingdata.io/sling-cli/replication/configuration
+# =============================================================================
+
+# Source connection reference (must match a connection name in component.yaml)
+source: CSV_SOURCE
+
+# Target connection reference (must match a connection name in component.yaml)
+target: POSTGRES_DEST
+
+# Default settings applied to all streams in this replication
+defaults:
+  # mode: How to sync data
+  #   - full-refresh: Delete all target data, reload everything
+  #   - incremental: Only sync new/updated records based on a cursor
+  #   - snapshot: Create a point-in-time copy
+  mode: full-refresh
+
+  # Source options for file-based sources
+  source_options:
+    format: csv  # File format: csv, json, parquet, etc.
+
+# Individual stream definitions
+# Each stream represents one table/file to replicate
+streams:
+  # ---------------------------------------------------------------------------
+  # Stream: raw_fact_virtual.csv
+  # ---------------------------------------------------------------------------
+  # Source path: Absolute path to the CSV file
+  # Target object: schema.table format in PostgreSQL
+  #
+  # Dagster Metadata:
+  #   The meta.dagster section customizes how this stream appears in Dagster:
+  #   - asset_key: Custom name in the asset graph (optional)
+  #   - group: Asset group for organization (optional)
+  #   - description: Human-readable description (optional)
+  #
+  # Tips:
+  #   - Use absolute paths for file sources to avoid confusion
+  #   - Schema must exist in PostgreSQL before running
+  #   - First row of CSV is treated as headers by default
+  # ---------------------------------------------------------------------------
+  /home/savas/dagster-test/dbt-cloud-orchestration/data/raw_fact_virtual.csv:
+    object: public.fact_virtual  # Target: schema.table
+
+    # Dagster-specific metadata (optional but recommended)
+    meta:
+      dagster:
+        asset_key: "csv_fact_virtual"      # Custom asset name in Dagster UI
+        group: "ingestion"                  # Asset group for filtering
+        description: "Virtual fact data from CSV files, loaded into PostgreSQL"
+
+  # Additional streams can be added here following the same pattern:
+  # /path/to/another_file.csv:
+  #   object: public.another_table
+  #   meta:
+  #     dagster:
+  #       asset_key: "another_asset"
+  #       group: "ingestion"

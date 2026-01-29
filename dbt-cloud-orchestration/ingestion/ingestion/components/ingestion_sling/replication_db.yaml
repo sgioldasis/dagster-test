@@ -1,0 +1,93 @@
+# =============================================================================
+# Sling Replication: PostgreSQL to Databricks
+# =============================================================================
+#
+# Purpose:
+#   Replicate data from PostgreSQL to Databricks Unity Catalog.
+#   This is the second step in the ingestion pipeline, taking data that was
+#   loaded in the CSV replication and moving it to the data lakehouse.
+#
+# Pipeline Position:
+#   CSV Files → PostgreSQL → [THIS REPLICATION] → Databricks
+#
+# Connections:
+#   - Source: POSTGRES_DEST (PostgreSQL - defined in component.yaml)
+#   - Target: DATABRICKS_TARGET (Databricks - defined in component.yaml)
+#
+# Mode:
+#   full-refresh: Truncates target table and reloads all data.
+#   For production, consider "incremental" mode with an update_key.
+#
+# Dagster Integration:
+#   This replication creates a Dagster asset named "databricks_fact_virtual"
+#   with an upstream dependency on "csv_fact_virtual".
+#
+# Key Concepts:
+#   - upstream_assets: Defines the dependency in Dagster's asset graph.
+#     This ensures csv_fact_virtual materializes before this replication runs.
+#
+# Reference:
+#   https://docs.slingdata.io/sling-cli/replication/configuration
+# =============================================================================
+
+# Source connection reference (PostgreSQL database)
+source: POSTGRES_DEST
+
+# Target connection reference (Databricks SQL warehouse)
+target: DATABRICKS_TARGET
+
+# Default settings applied to all streams
+defaults:
+  # full-refresh mode is suitable for small tables or initial loads.
+  # For large tables, consider:
+  #   mode: incremental
+  #   update_key: updated_at  # Column to track changes
+  mode: full-refresh
+
+# Individual stream definitions
+streams:
+  # ---------------------------------------------------------------------------
+  # Stream: public.fact_virtual
+  # ---------------------------------------------------------------------------
+  # Source: PostgreSQL table (schema.table format)
+  # Target: Databricks table (will use the configured catalog and schema)
+  #
+  # Dagster Metadata:
+  #   - asset_key: "databricks_fact_virtual" - Name in Dagster asset graph
+  #   - upstream_assets: ["csv_fact_virtual"] - Dependency relationship
+  #     This tells Dagster that csv_fact_virtual must be materialized first.
+  #
+  # Dependency Chain:
+  #   csv_fact_virtual (CSV → Postgres)
+  #         │
+  #         ▼ (upstream_assets dependency)
+  #   databricks_fact_virtual (Postgres → Databricks)
+  #
+  # Tips:
+  #   - Ensure the source table exists before running
+  #   - Databricks target table will be created if it doesn't exist
+  #   - Column types are automatically mapped between PostgreSQL and Databricks
+  # ---------------------------------------------------------------------------
+  public.fact_virtual:
+    object: fact_virtual  # Target table name in Databricks
+
+    # Dagster-specific metadata
+    meta:
+      dagster:
+        asset_key: "databricks_fact_virtual"
+        # upstream_assets creates a dependency in Dagster's asset graph.
+        # This ensures the CSV ingestion completes before this replication runs.
+        upstream_assets: ["csv_fact_virtual"]
+        group: "ingestion"
+        description: "Virtual fact data replicated from PostgreSQL to Databricks"
+
+  # Additional database streams can be added here:
+  # public.another_table:
+  #   object: another_table
+  #   mode: incremental
+  #   update_key: updated_at
+  #   meta:
+  #     dagster:
+  #       asset_key: "databricks_another_table"
+  #       upstream_assets: ["csv_another_table"]
+  #       group: "ingestion"
