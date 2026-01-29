@@ -4,7 +4,7 @@ This module provides a custom Dagster component that extends DltLoadCollectionCo
 to add project-specific behavior for data loading using dlt.
 
 The component provides custom asset naming to match the project's conventions:
-- dlt_csv_fact_virtual for CSV → PostgreSQL ingestion  
+- dlt_csv_fact_virtual for CSV → PostgreSQL ingestion
 - dlt_databricks_fact_virtual for PostgreSQL → Databricks ingestion
 """
 
@@ -12,8 +12,12 @@ from functools import cached_property
 from typing import Any, Mapping
 
 import dagster as dg
-from dagster import AssetKey, AssetSpec
-from dagster_dlt import DagsterDltResource, DagsterDltTranslator, DltLoadCollectionComponent
+from dagster import AssetKey, AssetSpec, AutomationCondition
+from dagster_dlt import (
+    DagsterDltResource,
+    DagsterDltTranslator,
+    DltLoadCollectionComponent,
+)
 from dagster_dlt.translator import DltResourceTranslatorData
 
 
@@ -48,25 +52,31 @@ class IngestionDltTranslator(DagsterDltTranslator):
 
         if pipeline_name == "csv_to_postgres" and resource_name == "dlt_fact_virtual":
             # CSV → PostgreSQL asset
+            # Use empty deps to hide the source asset (similar to Sling approach)
             return spec.replace_attributes(
                 key=AssetKey(["dlt_csv_fact_virtual"]),
                 group_name="ingestion",
                 description="Load CSV fact_virtual data into PostgreSQL using dlt",
+                deps=[],
             )
-        elif pipeline_name == "postgres_to_databricks" and resource_name == "dlt_fact_virtual":
+        elif (
+            pipeline_name == "postgres_to_databricks"
+            and resource_name == "dlt_fact_virtual"
+        ):
             # PostgreSQL → Databricks asset - depends on dlt_csv_fact_virtual
             return spec.replace_attributes(
                 key=AssetKey(["dlt_databricks_fact_virtual"]),
                 group_name="ingestion",
                 description="Load PostgreSQL dlt_fact_virtual data into Databricks test.main.dlt_fact_virtual using dlt",
                 deps=[AssetKey(["dlt_csv_fact_virtual"])],
+                automation_condition=AutomationCondition.eager(),
             )
 
-        # For source assets (not the main target assets), hide them by using a sanitized key
-        # This prevents exposing local file paths in the asset key
+        # For any other resources, hide them (shouldn't happen with current config)
         return spec.replace_attributes(
             key=AssetKey(["dlt_source", resource_name]),
             group_name="ingestion",
+            deps=[],
         )
 
 
@@ -99,7 +109,9 @@ class IngestionDltComponent(DltLoadCollectionComponent):
             Definitions with dlt assets.
         """
         from dagster_dlt.asset_decorator import dlt_assets
-        from dagster_dlt.components.dlt_load_collection.component import DltLoadSpecModel
+        from dagster_dlt.components.dlt_load_collection.component import (
+            DltLoadSpecModel,
+        )
 
         output = []
         for load in self.loads:

@@ -33,7 +33,7 @@ Key Features:
     1. Custom Asset Key Mapping: Removes 'target' prefix from asset keys
     2. Upstream Dependencies: Reads deps from YAML metadata
     3. Freshness Policies: Configured per-asset for data quality
-    4. Environment Variable Resolution: Supports env: and ${} syntax
+    4. Environment Variable Resolution: Supports ${ENV_VAR} syntax
     5. Databricks HTTP Path: Auto-constructs from warehouse_id
 
 Replication Configuration:
@@ -42,13 +42,16 @@ Replication Configuration:
 """
 
 import os
+import re
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 from datetime import timedelta
 
+import yaml
+
 import dagster as dg
-from dagster import AssetDep, AssetKey, AssetSpec
+from dagster import AssetDep, AssetKey, AssetSpec, AssetsDefinition
 from dagster_sling import (
     DagsterSlingTranslator,
     SlingConnectionResource,
@@ -102,24 +105,28 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
 
         Args:
             stream_definition: Dictionary containing stream configuration from YAML.
-                Includes keys like 'object', 'mode', 'meta', etc.
+                Includes keys like 'config', 'name', etc.
 
         Returns:
             AssetSpec with customized key, dependencies, freshness policy, and tags.
 
         Example stream_definition:
             {
-                'object': 'public.fact_virtual',
-                'meta': {
-                    'dagster': {
-                        'asset_key': 'databricks_fact_virtual',
-                        'upstream_assets': ['csv_fact_virtual'],
-                        'group': 'ingestion'
+                'name': 'public.fact_virtual',
+                'config': {
+                    'object': 'fact_virtual',
+                    'meta': {
+                        'dagster': {
+                            'asset_key': 'databricks_fact_virtual',
+                            'upstream_assets': ['csv_fact_virtual'],
+                            'group': 'ingestion'
+                        }
                     }
                 }
             }
         """
         # Get the base spec from the parent translator
+        # The base translator reads asset_key from config.meta.dagster.asset_key
         spec = super().get_asset_spec(stream_definition)
 
         # Strip 'target' prefix from asset key path if present
@@ -130,8 +137,8 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
             path = path[1:]
 
         # Read upstream dependencies from YAML metadata
-        # This allows defining asset dependencies in the replication YAML
-        deps = list(spec.deps)
+        # Start with empty list to avoid self-dependencies from base translator
+        deps: list[AssetDep] = []
         stream_config = stream_definition.get("config", {})
         dagster_meta = stream_config.get("meta", {}).get("dagster", {})
 
@@ -145,7 +152,8 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
         freshness_policy = None
         kinds = None
 
-        if spec.key.to_string() == '["csv_fact_virtual"]':
+        asset_key_str = spec.key.to_string()
+        if asset_key_str == '["csv_fact_virtual"]':
             # CSV → PostgreSQL ingestion asset
             # Short freshness window since CSV files are expected to update frequently
             freshness_policy = dg.FreshnessPolicy.time_window(
@@ -154,7 +162,7 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
             )
             kinds = {"sling", "csv", "postgres"}  # Tags for UI visualization
 
-        elif spec.key.to_string() == '["databricks_fact_virtual"]':
+        elif asset_key_str == '["databricks_fact_virtual"]':
             # PostgreSQL → Databricks ingestion asset
             # Longer window since this involves network transfer to Databricks
             freshness_policy = dg.FreshnessPolicy.time_window(
@@ -220,6 +228,128 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
         3: "DATABRICKS_TARGET",
     }
 
+    def _resolve_env_vars(self, value: Any) -> Any:
+        """Resolve environment variables in a value.
+
+        Replaces ${ENV_VAR} or ${ENV_VAR:-default} placeholders with values.
+
+        Args:
+            value: Value to resolve (str, dict, list, or other).
+
+        Returns:
+            Value with environment variables resolved.
+        """
+        if isinstance(value, str):
+            pattern = r'\$\{([^}]+)\}'
+
+            def replace_env_var(match: re.Match) -> str:
+                env_expr = match.group(1)
+                if ':-' in env_expr:
+                    var_name, default = env_expr.split(':-', 1)
+                    return os.environ.get(var_name, default)
+                return os.environ.get(env_expr, '')
+
+            return re.sub(pattern, replace_env_var, value)
+        elif isinstance(value, dict):
+            return {self._resolve_env_vars(k): self._resolve_env_vars(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._resolve_env_vars(item) for item in value]
+        return value
+
+    def _process_replication_config(self, config_path: Path) -> Path:
+        """Process replication config and resolve environment variables.
+
+        Reads the YAML, resolves ${ENV_VAR} in stream keys, and writes
+        a processed version if needed.
+
+        Args:
+            config_path: Path to the replication YAML file.
+
+        Returns:
+            Path to the config file to use (original or processed).
+        """
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Check if any stream keys contain environment variable references
+        needs_processing = False
+        if 'streams' in config:
+            for key in config['streams'].keys():
+                if '${' in str(key):
+                    needs_processing = True
+                    break
+
+        if not needs_processing:
+            return config_path
+
+        # Resolve environment variables in the config
+        config = self._resolve_env_vars(config)
+
+        # Write to a processed config file in the same directory
+        processed_path = config_path.parent / f".{config_path.stem}_processed.yaml"
+        with open(processed_path, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+
+        return processed_path
+
+    def build_asset(
+        self,
+        context: dg.ComponentLoadContext,
+        replication_spec_model: Any,
+    ) -> AssetsDefinition:
+        """Build a Sling asset using the custom translator.
+
+        This override ensures our custom translator is used, which sets
+        group_name="ingestion" on all asset specs.
+
+        Args:
+            context: Component load context.
+            replication_spec_model: Replication specification model.
+
+        Returns:
+            AssetsDefinition with ingestion group via custom translator.
+        """
+        from dagster import AssetExecutionContext
+        from dagster_sling import sling_assets
+
+        op_spec = replication_spec_model.op
+
+        # Process the config to resolve env vars before passing to sling_assets
+        # This must happen at build time because sling_assets reads the config
+        original_config_path = context.path / replication_spec_model.path
+        processed_config_path = self._process_replication_config(original_config_path)
+
+        @sling_assets(
+            name=op_spec.name if op_spec and op_spec.name else Path(replication_spec_model.path).stem,
+            op_tags=op_spec.tags if op_spec else None,
+            replication_config=processed_config_path,
+            dagster_sling_translator=self._base_translator,
+            backfill_policy=op_spec.backfill_policy if op_spec else None,
+        )
+        def _asset(context: AssetExecutionContext, sling: SlingResource):
+            yield from self.execute(
+                context=context,
+                sling=sling,
+                replication_spec_model=replication_spec_model,
+            )
+
+        return _asset
+
+    def build_defs(self, context: dg.ComponentLoadContext) -> dg.Definitions:
+        """Build definitions with sling resource.
+
+        This override ensures the sling resource is registered.
+
+        Args:
+            context: Component load context.
+
+        Returns:
+            Definitions with assets and sling resource.
+        """
+        return dg.Definitions(
+            assets=[self.build_asset(context, replication) for replication in self.replications],
+            resources={"sling": self.sling_resource},
+        )
 
     @cached_property
     def _base_translator(self) -> DagsterSlingTranslator:
@@ -246,13 +376,9 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
         """Build the SlingResource with resolved connections.
 
         This method processes connection configurations from the YAML and:
-        1. Resolves environment variables (env:VAR_NAME or ${VAR_NAME} syntax)
+        1. Resolves environment variables in connection properties
         2. Auto-constructs Databricks http_path from warehouse_id if needed
         3. Creates SlingConnectionResource objects for each connection
-
-        Environment Variable Syntax:
-            - env:POSTGRES_CONNECTION_STRING  # Sling-style
-            - ${DATABRICKS_HOST}              # Shell-style
 
         Returns:
             Configured SlingResource ready for replication execution.
@@ -279,16 +405,6 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
                     elif value.startswith("${") and value.endswith("}"):
                         # Shell-style env var reference: ${VAR_NAME}
                         conn_dict[key] = os.environ.get(value[2:-1], "")
-
-            # Special handling for CSV_SOURCE file connection
-            # Set the URL from environment variable if not already set
-            if conn_dict.get("name") == "CSV_SOURCE" and conn_dict.get("type") == "file":
-                csv_path = os.environ.get("CSV_DATA_PATH", "")
-                if csv_path:
-                    # Ensure file:// protocol prefix
-                    if not csv_path.startswith("file://"):
-                        csv_path = f"file://{csv_path}"
-                    conn_dict["url"] = csv_path
 
             # Auto-construct Databricks http_path if warehouse_id is provided
             if conn_dict.get("type") == "databricks":
@@ -324,11 +440,18 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
         Example replication_spec_model:
             ReplicationSpecModel(path="replication_csv.yaml")
         """
-        config_path = Path(__file__).parent / replication_spec_model.path
-        context.log.info(f"Executing Sling replication for {config_path}")
+        # Use the processed config file if it exists, otherwise use original
+        original_config_path = Path(__file__).parent / replication_spec_model.path
+        processed_config_path = original_config_path.parent / f".{original_config_path.stem}_processed.yaml"
+
+        if processed_config_path.exists():
+            config_path = processed_config_path
+            context.log.info(f"Using processed Sling config: {config_path}")
+        else:
+            config_path = original_config_path
+            context.log.info(f"Using original Sling config: {config_path}")
 
         # Use the custom sling_resource with resolved env vars
-        # The passed 'sling' uses base class sling_resource which doesn't resolve env vars
         yield from self.sling_resource.replicate(
             context=context,
             replication_config=config_path,

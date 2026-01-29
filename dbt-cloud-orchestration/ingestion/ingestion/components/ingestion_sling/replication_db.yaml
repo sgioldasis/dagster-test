@@ -26,6 +26,9 @@
 #   - upstream_assets: Defines the dependency in Dagster's asset graph.
 #     This ensures csv_fact_virtual materializes before this replication runs.
 #
+# Note: For dagster-sling to recognize metadata, fields must be at the stream level,
+# NOT under a 'config' key. The stream definition becomes {"name": stream, "config": {...}}
+#
 # Reference:
 #   https://docs.slingdata.io/sling-cli/replication/configuration
 # =============================================================================
@@ -63,6 +66,9 @@ streams:
   #         ▼ (upstream_assets dependency)
   #   databricks_fact_virtual (Postgres → Databricks)
   #
+  # IMPORTANT: These fields must be at the stream level (NOT under 'config')
+  # because dagster-sling wraps them as {"name": stream, "config": {...}}
+  #
   # Tips:
   #   - Ensure the source table exists before running
   #   - Databricks target table will be created if it doesn't exist
@@ -71,7 +77,7 @@ streams:
   public.fact_virtual:
     object: fact_virtual  # Target table name in Databricks
 
-    # Dagster-specific metadata
+    # Dagster-specific metadata (must be at stream level, NOT under 'config')
     meta:
       dagster:
         asset_key: "databricks_fact_virtual"

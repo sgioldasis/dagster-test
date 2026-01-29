@@ -203,3 +203,6 @@ __marimo__/
 .streamlit/secrets.toml
 fact_virtual_count.json
 output/
+
+# Sling processed replication configs (auto-generated)
+.replication_*_processed.yaml

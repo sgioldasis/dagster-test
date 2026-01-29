@@ -121,6 +121,7 @@ remains available for explicit scheduling scenarios.
 # ASSETS
 # =============================================================================
 
+
 @dg.asset(
     key="run_databricks_ingestion_job",
     group_name="ingestion",
@@ -269,15 +270,15 @@ thresholds.
 """
 
 # Combine all freshness checks for registration
-all_freshness_checks = (
-    list(csv_fact_virtual_freshness_checks) +
-    list(databricks_fact_virtual_freshness_checks)
+all_freshness_checks = list(csv_fact_virtual_freshness_checks) + list(
+    databricks_fact_virtual_freshness_checks
 )
 
 
 # =============================================================================
 # DEFINITIONS
 # =============================================================================
+
 
 def get_definitions() -> dg.Definitions:
     """Build and return the complete Dagster Definitions object.
@@ -334,22 +335,8 @@ def get_definitions() -> dg.Definitions:
         ),
     )
 
-    # Rebuild definitions with updated group names
-    updated_assets = []
-    for asset in merged_defs.assets or []:
-        # Only apply map_asset_specs to AssetsDefinition objects
-        if hasattr(asset, 'map_asset_specs'):
-            updated_assets.append(
-                asset.map_asset_specs(
-                    lambda spec: spec.replace_attributes(group_name="ingestion")
-                )
-            )
-        else:
-            # For source assets (AssetSpec), they're already in ingestion group
-            updated_assets.append(asset)
-
     return dg.Definitions(
-        assets=updated_assets,
+        assets=merged_defs.assets,
         resources=merged_defs.resources,
         sensors=merged_defs.sensors,
         asset_checks=merged_defs.asset_checks,

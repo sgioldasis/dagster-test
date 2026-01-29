@@ -21,6 +21,9 @@
 #   This replication creates a Dagster asset named "csv_fact_virtual".
 #   The asset key is defined in the meta.dagster section below.
 #
+# Note: For dagster-sling to recognize metadata, fields must be at the stream level,
+# NOT under a 'config' key. The stream definition becomes {"name": stream, "config": {...}}
+#
 # Reference:
 #   https://docs.slingdata.io/sling-cli/replication/configuration
 # =============================================================================
@@ -58,15 +61,19 @@ streams:
   #   - group: Asset group for organization (optional)
   #   - description: Human-readable description (optional)
   #
+  # IMPORTANT: These fields must be at the stream level (NOT under 'config')
+  # because dagster-sling wraps them as {"name": stream, "config": {...}}
+  #
   # Tips:
   #   - Use absolute paths for file sources to avoid confusion
   #   - Schema must exist in PostgreSQL before running
   #   - First row of CSV is treated as headers by default
   # ---------------------------------------------------------------------------
-  /home/savas/dagster-test/dbt-cloud-orchestration/data/raw_fact_virtual.csv:
+  # Stream path using CSV_DATA_PATH environment variable
+  "${CSV_DATA_PATH}/raw_fact_virtual.csv":
     object: public.fact_virtual  # Target: schema.table
 
-    # Dagster-specific metadata (optional but recommended)
+    # Dagster-specific metadata (must be at stream level, NOT under 'config')
     meta:
       dagster:
         asset_key: "csv_fact_virtual"      # Custom asset name in Dagster UI

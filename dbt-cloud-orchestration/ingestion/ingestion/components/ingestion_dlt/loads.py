@@ -21,6 +21,7 @@ load_dotenv()
 # PostgreSQL Pipeline (CSV → PostgreSQL)
 # =============================================================================
 
+
 def _get_postgres_credentials_dict() -> dict:
     """Get PostgreSQL credentials as a dictionary for DLT destination.
 
@@ -29,10 +30,11 @@ def _get_postgres_credentials_dict() -> dict:
     """
     # Check for explicit connection string first
     conn_string = os.environ.get("POSTGRES_CONNECTION_STRING")
-    
+
     if conn_string:
         # Parse connection string into dict format that DLT expects
         from urllib.parse import urlparse
+
         parsed = urlparse(conn_string)
         return {
             "host": parsed.hostname or "localhost",
@@ -41,7 +43,7 @@ def _get_postgres_credentials_dict() -> dict:
             "username": parsed.username or "postgres",
             "password": parsed.password or "",  # Allow empty password
         }
-    
+
     # Build from individual env vars
     return {
         "host": os.environ.get("LOCAL_POSTGRES_HOST", "localhost"),
@@ -62,17 +64,17 @@ def _get_postgres_credentials() -> str:
     """
     # Check for explicit connection string first
     conn_string = os.environ.get("POSTGRES_CONNECTION_STRING")
-    
+
     if conn_string:
         return conn_string
-    
+
     # Build from individual env vars
     host = os.environ.get("LOCAL_POSTGRES_HOST", "localhost")
     port = os.environ.get("LOCAL_POSTGRES_PORT", "5432")
     database = os.environ.get("LOCAL_POSTGRES_DATABASE", "postgres")
     username = os.environ.get("LOCAL_POSTGRES_USER", "postgres")
     password = os.environ.get("LOCAL_POSTGRES_PASSWORD", "")
-    
+
     if password:
         return f"postgresql://{username}:{password}@{host}:{port}/{database}"
     else:
@@ -100,6 +102,7 @@ csv_source = dlt_pipeline.csv_source()
 # Databricks Pipeline (PostgreSQL → Databricks)
 # =============================================================================
 
+
 def _get_databricks_credentials() -> dict:
     """Get Databricks credentials from environment.
 
@@ -109,7 +112,7 @@ def _get_databricks_credentials() -> dict:
     warehouse_id = os.environ.get("DATABRICKS_WAREHOUSE_ID", "")
     http_path = os.environ.get(
         "DATABRICKS_HTTP_PATH",
-        f"/sql/1.0/warehouses/{warehouse_id}" if warehouse_id else ""
+        f"/sql/1.0/warehouses/{warehouse_id}" if warehouse_id else "",
     )
 
     return {
@@ -135,6 +138,7 @@ databricks_pipeline = dlt.pipeline(
 # SQL Table Source for PostgreSQL (used for Databricks ingestion)
 # =============================================================================
 
+
 def _create_postgres_fact_virtual_source():
     """Create a dlt source for reading dlt_fact_virtual from PostgreSQL.
 
@@ -144,22 +148,36 @@ def _create_postgres_fact_virtual_source():
         DLT source with sql_table resource for dlt_fact_virtual table.
     """
     from dlt.sources.sql_database import sql_table
+    from sqlalchemy import exc
 
-    # Create the sql_table resource with write_disposition set to replace
-    dlt_fact_virtual_table = sql_table(
-        table="dlt_fact_virtual",
-        schema="public",
-        credentials=_get_postgres_credentials(),
-    )
-    # Set write disposition to replace for full-refresh behavior
-    dlt_fact_virtual_table.write_disposition = "replace"
+    try:
+        # Create the sql_table resource with write_disposition set to replace
+        dlt_fact_virtual_table = sql_table(
+            table="dlt_fact_virtual",
+            schema="public",
+            credentials=_get_postgres_credentials(),
+        )
+        # Set write disposition to replace for full-refresh behavior
+        dlt_fact_virtual_table.write_disposition = "replace"
 
-    # Wrap it in a source
-    @dlt.source(name="postgres_source")
-    def postgres_source():
-        yield dlt_fact_virtual_table
+        # Wrap it in a source
+        @dlt.source(name="postgres_source")
+        def postgres_source():
+            yield dlt_fact_virtual_table
 
-    return postgres_source()
+        return postgres_source()
+    except exc.NoSuchTableError:
+        # Table doesn't exist yet, create a dummy empty source
+        @dlt.resource(name="dlt_fact_virtual", write_disposition="replace")
+        def empty_table():
+            # Return empty list when table doesn't exist
+            return []
+
+        @dlt.source(name="postgres_source")
+        def postgres_source():
+            yield empty_table
+
+        return postgres_source()
 
 
 # SQL table source instance for PostgreSQL dlt_fact_virtual table
