@@ -44,7 +44,7 @@ Replication Configuration:
 import os
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from datetime import timedelta
 
 import dagster as dg
@@ -57,6 +57,9 @@ from dagster_sling import (
 )
 from dotenv import load_dotenv
 
+# Load environment variables at module load time
+load_dotenv()
+
 
 class IngestionSlingTranslator(DagsterSlingTranslator):
     """Custom translator for Sling stream definitions to Dagster asset specs.
@@ -68,10 +71,28 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
     2. Dependency Management: Reads upstream asset dependencies from YAML metadata
     3. Freshness Policies: Applies time-window freshness policies per asset
     4. Asset Kinds: Tags assets with source/target system types
+    5. Source Asset Control: Optionally hides file-based source assets
 
     The translator is used by IngestionSlingComponent when building asset specs
     from Sling replication configurations.
     """
+
+    def get_deps(self, stream_definition: Mapping[str, Any]) -> list[AssetDep]:
+        """Get upstream dependencies for a stream.
+
+        Overrides the default behavior to hide file-based source assets
+        by returning an empty list. This prevents Dagster from showing
+        source assets that expose local file paths.
+
+        Args:
+            stream_definition: Stream configuration from replication YAML.
+
+        Returns:
+            Empty list to hide source assets.
+        """
+        # Return empty list to hide source assets
+        # This prevents showing file path-based assets in the Dagster UI
+        return []
 
     def get_asset_spec(self, stream_definition: Mapping[str, Any]) -> AssetSpec:
         """Convert a Sling stream definition to a Dagster AssetSpec.
@@ -190,6 +211,16 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
     for each stream defined within them.
     """
 
+    # Connection names based on component.yaml order
+    # These must match the order in component.yaml
+    _CONNECTION_NAMES: dict[int, str] = {
+        0: "CSV_SOURCE",
+        1: "POSTGRES_DEST",
+        2: "POSTGRES_TARGET",
+        3: "DATABRICKS_TARGET",
+    }
+
+
     @cached_property
     def _base_translator(self) -> DagsterSlingTranslator:
         """Create and cache the custom translator instance.
@@ -226,28 +257,40 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
         Returns:
             Configured SlingResource ready for replication execution.
         """
-        load_dotenv()  # Ensure environment variables are loaded
+        # self.connections is a Sequence of SlingConnectionResource
+        # We need to preserve the connection names from the original config
 
         resolved_connections = []
-        for conn in self.connections:
+        for idx, conn in enumerate(self.connections):
             conn_dict = conn.model_dump()
+
+            # Set the connection name from our predefined mapping
+            if idx in self._CONNECTION_NAMES:
+                conn_dict["name"] = self._CONNECTION_NAMES[idx]
+            elif hasattr(conn, 'name') and conn.name:
+                conn_dict["name"] = conn.name
 
             # Resolve environment variables in connection properties
             for key, value in conn_dict.items():
                 if isinstance(value, str):
                     if value.startswith("env:"):
                         # Sling-style env var reference: env:VAR_NAME
-                        conn_dict[key] = os.environ.get(value[4:], value)
+                        conn_dict[key] = os.environ.get(value[4:], "")
                     elif value.startswith("${") and value.endswith("}"):
                         # Shell-style env var reference: ${VAR_NAME}
-                        conn_dict[key] = os.environ.get(value[2:-1], value)
+                        conn_dict[key] = os.environ.get(value[2:-1], "")
 
-            # Ensure connection has a name
-            if "name" not in conn_dict and hasattr(conn, "name"):
-                conn_dict["name"] = conn.name
+            # Special handling for CSV_SOURCE file connection
+            # Set the URL from environment variable if not already set
+            if conn_dict.get("name") == "CSV_SOURCE" and conn_dict.get("type") == "file":
+                csv_path = os.environ.get("CSV_DATA_PATH", "")
+                if csv_path:
+                    # Ensure file:// protocol prefix
+                    if not csv_path.startswith("file://"):
+                        csv_path = f"file://{csv_path}"
+                    conn_dict["url"] = csv_path
 
             # Auto-construct Databricks http_path if warehouse_id is provided
-            # This is required for Databricks SQL warehouse connections
             if conn_dict.get("type") == "databricks":
                 if not conn_dict.get("http_path") and conn_dict.get("warehouse_id"):
                     conn_dict["http_path"] = (
@@ -284,7 +327,8 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
         config_path = Path(__file__).parent / replication_spec_model.path
         context.log.info(f"Executing Sling replication for {config_path}")
 
-        # Run the replication with our custom translator
+        # Use the custom sling_resource with resolved env vars
+        # The passed 'sling' uses base class sling_resource which doesn't resolve env vars
         yield from self.sling_resource.replicate(
             context=context,
             replication_config=config_path,

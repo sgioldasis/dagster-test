@@ -40,10 +40,10 @@ attributes:
 
     # CSV_SOURCE: File system connection for reading CSV files
     # Used by: replication_csv.yaml
+    # The URL is set from CSV_DATA_PATH environment variable
     CSV_SOURCE:
       type: file
-      # No additional config needed for local files
-      # Path to files is specified in the replication stream configuration
+      url: env:CSV_DATA_PATH
 
     # POSTGRES_DEST: PostgreSQL destination for CSV data
     # Used by: replication_csv.yaml (as target) and replication_db.yaml (as source)

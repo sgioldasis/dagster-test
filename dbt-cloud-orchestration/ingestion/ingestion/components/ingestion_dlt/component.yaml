@@ -1,0 +1,60 @@
+# =============================================================================
+# DLT Ingestion Component Configuration
+# =============================================================================
+#
+# This YAML file configures the IngestionDltComponent which manages
+# data loading using dlt (data load tool) - https://dlthub.com/
+#
+# Purpose:
+#   Define dlt sources and pipelines for loading data between CSV, PostgreSQL,
+#   and Databricks. This provides an alternative to the Sling-based ingestion.
+#
+# Pipeline Flow:
+#   CSV Files → [dlt_csv_fact_virtual] → PostgreSQL
+#                                                 │
+#                                                 ▼
+#                                      [dlt_databricks_fact_virtual]
+#                                                 │
+#                                                 ▼
+#                                           Databricks
+#
+# Components:
+#   - csv_source: Reads from CSV files using dlt resources
+#   - postgres_pipeline: Loads data to PostgreSQL
+#   - databricks_pipeline: Loads data to Databricks
+#
+# Asset Naming:
+#   - dlt_csv_fact_virtual: Asset for CSV → PostgreSQL ingestion
+#   - dlt_databricks_fact_virtual: Asset for PostgreSQL → Databricks ingestion
+#
+# =============================================================================
+
+type: ingestion.components.ingestion_dlt.IngestionDltComponent
+
+attributes:
+  loads:
+    # ==========================================================================
+    # Load 1: CSV → PostgreSQL
+    # ==========================================================================
+    # This load reads data from CSV files and loads it into PostgreSQL.
+    # It creates the "dlt_csv_fact_virtual" asset.
+    #
+    # Source: CSV files (defined in dlt_pipeline.py)
+    # Destination: PostgreSQL database
+    # Pipeline: loads.postgres_pipeline
+    # ==========================================================================
+    - source: .loads.csv_source
+      pipeline: .loads.postgres_pipeline
+
+    # ==========================================================================
+    # Load 2: PostgreSQL → Databricks
+    # ==========================================================================
+    # This load reads data from PostgreSQL and loads it into Databricks.
+    # It creates the "dlt_databricks_fact_virtual" asset.
+    #
+    # Source: PostgreSQL table (loaded via sql_table source)
+    # Destination: Databricks Unity Catalog
+    # Pipeline: loads.databricks_pipeline
+    # ==========================================================================
+    - source: .loads.postgres_fact_virtual_source
+      pipeline: .loads.databricks_pipeline

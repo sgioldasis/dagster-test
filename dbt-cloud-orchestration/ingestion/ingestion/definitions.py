@@ -314,7 +314,7 @@ def get_definitions() -> dg.Definitions:
         freshness_checks=all_freshness_checks,
     )
 
-    # Merge component definitions with programmatic definitions
+    # Merge component definitions with programmatic definitions and source assets
     merged_defs = dg.Definitions.merge(
         component_defs,
         dg.Definitions(
@@ -334,11 +334,27 @@ def get_definitions() -> dg.Definitions:
         ),
     )
 
-    # Ensure consistent group name for all assets
-    return merged_defs.map_asset_specs(
-        func=lambda spec: spec.replace_attributes(
-            group_name="ingestion",
-        )
+    # Rebuild definitions with updated group names
+    updated_assets = []
+    for asset in merged_defs.assets or []:
+        # Only apply map_asset_specs to AssetsDefinition objects
+        if hasattr(asset, 'map_asset_specs'):
+            updated_assets.append(
+                asset.map_asset_specs(
+                    lambda spec: spec.replace_attributes(group_name="ingestion")
+                )
+            )
+        else:
+            # For source assets (AssetSpec), they're already in ingestion group
+            updated_assets.append(asset)
+
+    return dg.Definitions(
+        assets=updated_assets,
+        resources=merged_defs.resources,
+        sensors=merged_defs.sensors,
+        asset_checks=merged_defs.asset_checks,
+        jobs=merged_defs.jobs,
+        schedules=merged_defs.schedules,
     )
 
 

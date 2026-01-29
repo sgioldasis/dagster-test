@@ -6,6 +6,9 @@ dependencies = [
     "dagster>=1.12.8",
     "dagster-databricks>=0.28.0",
     "dagster-sling>=0.28.0",
+    "dagster-dlt>=0.28.1",
+    "dlt[postgres]>=1.5.0",
+    "dlt[databricks]>=1.5.0",
     "pandas>=2.3.3",
     "pyarrow>=14.0.0",
     "psycopg2-binary>=2.9.9",
@@ -32,4 +35,7 @@ directory_type = "project"
 
 [tool.dg.project]
 root_module = "ingestion"
+registry_modules = [
+    "ingestion.components.*",
+]
 
