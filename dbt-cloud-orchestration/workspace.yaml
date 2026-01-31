@@ -2,17 +2,17 @@ load_from:
   - python_module:
       module_name: "ingestion.definitions"
       attribute: "ingestion_defs"
-      working_directory: "ingestion"
+      working_directory: "ingestion/src"
       location_name: "ingestion"
 
   - python_module:
       module_name: "dbt_orchestration.definitions"
       attribute: "dbt_defs"
-      working_directory: "dbt"
+      working_directory: "dbt/src"
       location_name: "dbt"
 
   - python_module:
       module_name: "downstream.definitions"
       attribute: "downstream_defs"
-      working_directory: "downstream"
+      working_directory: "downstream/src"
       location_name: "downstream"
