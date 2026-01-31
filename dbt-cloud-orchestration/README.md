@@ -13,40 +13,49 @@ This project implements an ELT (Extract, Load, Transform) pipeline that showcase
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              INGESTION CODE LOCATION                         │
-│  ┌─────────────┐    ┌──────────────┐    ┌──────────────┐    ┌─────────────┐ │
-│  │ CSV Files   │───▶│csv_fact_     │───▶│fact_virtual  │───▶│Databricks   │ │
-│  │ (data/)     │    │virtual       │    │              │    │Job (opt)    │ │
-│  └─────────────┘    │(Sling)       │    │(Sling)       │    │             │ │
-│                     └──────────────┘    └──────────────┘    └─────────────┘ │
-│                           │                      │                           │
-│                     PostgreSQL            Databricks                         │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        INGESTION CODE LOCATION                          │
+│                                                                         │
+│   ┌───────────┐   ┌──────────────┐   ┌──────────────┐   ┌────────────┐  │
+│   │ CSV Files │─▶│csv_fact_     │─▶│fact_virtual  │─▶│Databricks  │  │
+│   │ (data/)   │   │virtual       │   │              │   │Job (opt)   │  │
+│   └───────────┘   │(Sling)       │   │(Sling)       │   └────────────┘  │
+│                   └──────────────┘   └──────────────┘                   │
+│                          │                   │                          │
+│                    PostgreSQL          Databricks                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                DBT CODE LOCATION                             │
-│  ┌─────────────────────────────────────────────────────────────────────────┐ │
-│  │                    dbt Cloud Workspace                                   │ │
-│  │  ┌─────────────────┐    ┌─────────────────────────────────────────────┐ │ │
-│  │  │ fact_virtual    │───▶│ stg_kaizen_wars__fact_virtual               │ │ │
-│  │  │ (Source Asset)  │    │ (dbt Cloud Model)                           │ │ │
-│  │  └─────────────────┘    └─────────────────────────────────────────────┘ │ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          DBT CODE LOCATION                              │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │                    dbt Cloud Workspace                          │   │
+│   │                                                                 │   │
+│   │  ┌───────────────┐    ┌───────────────────────────────────────┐ │   │
+│   │  │ fact_virtual  │──▶│ stg_kaizen_wars__fact_virtual         │ │   │
+│   │  │ (Source)      │    │ (dbt Cloud Model)                     │ │   │
+│   │  └───────────────┘    └───────────────────────────────────────┘ │   │
+│   │                                                                 │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            DOWNSTREAM CODE LOCATION                          │
-│  ┌─────────────────────────────────────────────────────────────────────────┐ │
-│  │  ┌─────────────────────────────┐    ┌─────────────────────────────────┐  │ │
-│  │  │ dbt_optimove/               │───▶│ downstream/                     │  │ │
-│  │  │ stg_kaizen_wars__fact_virtual│   │ fact_virtual_count              │  │ │
-│  │  └─────────────────────────────┘    │ (JSON output: output/)          │  │ │
-│  │                                     └─────────────────────────────────┘  │ │
-│  └─────────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       DOWNSTREAM CODE LOCATION                          │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  ┌─────────────────────────┐    ┌────────────────────────────┐  │   │
+│   │  │ dbt_optimove/           │──▶│ downstream/                │  │   │
+│   │  │stg_kaizen_wars__fact_   │    │ fact_virtual_count         │  │   │
+│   │  │virtual                  │    │ (JSON: output/)            │  │   │
+│   │  └─────────────────────────┘    └────────────────────────────┘  │   │
+│   │                                                                 │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -119,13 +128,23 @@ kc test
 ```
 
 **Key Assets:**
+
+*Sling Assets (default):*
 - `csv_fact_virtual` - Loads CSV data into PostgreSQL (Sling)
 - `fact_virtual` - Replicates data from PostgreSQL to Databricks (Sling)
+
+*DLT Assets (alternative):*
+- `dlt_csv_fact_virtual` - Loads CSV data into PostgreSQL using [DLT](https://dlthub.com/)
+- `dlt_databricks_fact_virtual` - Replicates PostgreSQL data to Databricks using DLT
+
+*Databricks:*
 - `run_databricks_ingestion_job` - Triggers Databricks notebook job (optional)
 
 **Schedule:** Runs every 2 minutes (`csv_fact_virtual_schedule`)
 
 ### dbt Team
+
+The dbt code location integrates with [dbt Cloud](https://www.getdbt.com/product/dbt-cloud) to automatically load and parse your dbt project assets into Dagster. It uses the dbt Cloud REST API to discover models, sources, and other assets, then creates corresponding Dagster assets with proper lineage and automation conditions.
 
 ```bash
 cd dbt/
@@ -137,11 +156,31 @@ kc dev
 kc test
 ```
 
+**How it works:**
+1. Connects to dbt Cloud API using your credentials
+2. Discovers all models, sources, and other dbt resources
+3. Creates Dagster assets that map to your dbt Cloud models
+4. Establishes lineage between ingestion sources and dbt models
+5. Automatically triggers runs when upstream dependencies materialize
+
 **Key Assets:**
-- `fact_virtual` - Source asset from ingestion code location
-- `stg_kaizen_wars__fact_virtual` - Staging model from dbt Cloud
+- `fact_virtual` - Source asset representing data from the ingestion code location
+- `stg_kaizen_wars__fact_virtual` - Staging model loaded from dbt Cloud
+  
+  **Note:** This asset is treated specially because it's needed by the downstream project. Unlike other dbt Cloud assets that are auto-discovered, this one is explicitly defined with:
+  - A dependency on `fact_virtual` from the ingestion code location
+  - A freshness policy for monitoring data quality
+  - `AutomationCondition.any_deps_updated()` for immediate triggering when upstream data changes
+  
+  This ensures the downstream `fact_virtual_count` asset can properly depend on it across code location boundaries.
+
+- `my_dbt_cloud_assets` - All dbt Cloud models as Dagster assets
 
 **Automation:** Assets trigger automatically when upstream dependencies update (`AutomationCondition.any_deps_updated()`)
+
+**Sensors:**
+- `dbt_cloud_polling_sensor` - Monitors dbt Cloud run status and materializes assets on completion
+- `default_automation_sensor` - Triggers asset runs based on automation conditions
 
 ### Downstream Team
 
@@ -273,22 +312,41 @@ See [`.env.example`](.env.example) for the complete list. Key variables:
 
 ### CSV files not found
 
-`CSV_DATA_PATH` must be an **absolute** path:
+Ensure your `.env` file is loaded and `CSV_DATA_PATH` is set to an **absolute** path:
 
 ```bash
-# Wrong
-export CSV_DATA_PATH=./data
+# Load environment variables from .env file
+set -a && source .env && set +a
 
-# Correct
-export CSV_DATA_PATH=/home/user/projects/dbt-cloud-orchestration/data
+# Verify it's set
+echo $CSV_DATA_PATH
+
+# Path must be absolute (not relative)
+# Wrong: export CSV_DATA_PATH=./data
+# Correct: export CSV_DATA_PATH=/home/user/projects/dbt-cloud-orchestration/data
 ```
+
+Note: The ingestion code loads `.env` automatically, but Sling (which runs as a subprocess) needs the variable in the shell environment.
 
 ### dbt Cloud assets not loading
 
-Verify your environment variables:
+First, ensure you've loaded the environment variables from your `.env` file:
 
 ```bash
-# Check if variables are set
+# Option 1: Source the .env file
+set -a && source .env && set +a
+
+# Option 2: Set variables individually
+export DBT_CLOUD_TOKEN="your_token_here"
+export DBT_CLOUD_ACCOUNT_ID="your_account_id"
+
+# Option 3: Use a tool like direnv to auto-load .env files
+```
+
+Then verify the variables are set in your shell:
+
+```bash
+# Check if variables are loaded
 echo $DBT_CLOUD_TOKEN
 echo $DBT_CLOUD_ACCOUNT_ID
 
@@ -296,6 +354,8 @@ echo $DBT_CLOUD_ACCOUNT_ID
 curl -H "Authorization: Bearer $DBT_CLOUD_TOKEN" \
   "$DBT_CLOUD_ACCESS_URL/api/v2/accounts/$DBT_CLOUD_ACCOUNT_ID/projects/"
 ```
+
+Note: Dagster code automatically loads `.env` files when running (via `load_dotenv()`), but the `curl` command above needs variables in your shell environment.
 
 ### Port already in use
 
