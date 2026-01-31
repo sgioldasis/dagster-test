@@ -12,7 +12,7 @@ OUTPUT_DIR = Path(EnvVar("OUTPUT_DIR").get_value() or "./output")
 
 
 @asset(
-    deps=[dg.AssetKey("stg_kaizen_wars__fact_virtual")],
+    deps=[dg.AssetKey(["dbt_optimove", "stg_kaizen_wars__fact_virtual"])],
     description="Asset that counts records in stg_kaizen_wars__fact_virtual and writes to file",
     automation_condition=dg.AutomationCondition.any_deps_updated(),
     group_name="downstream",

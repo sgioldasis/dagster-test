@@ -1,6 +1,6 @@
 # dbt/src/dbt/defs/assets.py
 import time
-from typing import Optional
+from typing import Optional, Mapping, Any
 from datetime import timedelta
 
 import dagster as dg
@@ -10,6 +10,7 @@ from dagster import (
     asset,
     FreshnessPolicy,
     JobDefinition,
+    AssetKey,
 )
 from dagster_dbt.cloud_v2.asset_decorator import dbt_cloud_assets
 from dagster_dbt.cloud_v2.resources import (
@@ -17,9 +18,42 @@ from dagster_dbt.cloud_v2.resources import (
     DbtCloudWorkspace,
 )
 from dagster_dbt.cloud_v2.sensor_builder import build_dbt_cloud_polling_sensor
+from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator
 import requests
 
 from .resources import DbtCloudCredentials, DbtCloudRunConfig
+
+
+class PackageAwareDbtTranslator(DagsterDbtTranslator):
+    """Custom translator that includes dbt package name in asset keys to avoid collisions.
+    
+    When multiple dbt packages have models with the same name (e.g., bonus_cost in both
+    dbt_optimove and dbt_rewards), the default translator generates identical asset keys.
+    This translator prefixes asset keys with the dbt package name to ensure uniqueness.
+    """
+
+    def get_asset_key(self, dbt_resource_props: Mapping[str, Any]) -> AssetKey:
+        """Generate asset key with package name prefix to avoid collisions.
+        
+        Args:
+            dbt_resource_props: Dictionary containing dbt resource properties.
+                See: https://docs.getdbt.com/reference/artifacts/manifest-json#resource-details
+        
+        Returns:
+            AssetKey with package name as prefix (e.g., ["dbt_optimove", "bonus_cost"]).
+        """
+        # Get the default asset key from the parent class
+        base_key = super().get_asset_key(dbt_resource_props)
+        
+        # Get the package name from the dbt resource properties
+        # The package_name field is available for all dbt resources
+        package_name = dbt_resource_props.get("package_name")
+        
+        # If we have a package name, prefix the asset key with it
+        if package_name:
+            return AssetKey([package_name, *base_key.path])
+        
+        return base_key
 
 
 def create_dbt_cloud_workspace(
@@ -110,7 +144,15 @@ def create_dbt_cloud_definitions(
         run_config.timeout_seconds if run_config else credentials.run_timeout_seconds
     )
 
-    @dbt_cloud_assets(workspace=workspace, group_name="dbt")
+    # Use custom translator to avoid asset key collisions when multiple dbt packages
+    # have models with the same name (e.g., bonus_cost in dbt_optimove and dbt_rewards)
+    custom_translator = PackageAwareDbtTranslator()
+
+    @dbt_cloud_assets(
+        workspace=workspace,
+        group_name="dbt",
+        dagster_dbt_translator=custom_translator,
+    )
     def my_dbt_cloud_assets(
         context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
     ):
@@ -131,7 +173,7 @@ def create_dbt_cloud_definitions(
 
             if spec.key.path[-1] == target_key:
                 return spec.replace_attributes(
-                    deps=[*spec.deps, dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])],
+                    deps=[*spec.deps, dg.AssetKey(["databricks_fact_virtual"])],
                     automation_condition=dg.AutomationCondition.any_deps_updated(),
                     freshness_policy=FreshnessPolicy.cron(
                         deadline_cron="*/1 * * * *",
@@ -151,7 +193,7 @@ def create_dbt_cloud_definitions(
 
         @asset(
             key=[target_key],
-            deps=[dg.AssetKey(["dlt_kaizen_wars_fact_virtual"])],
+            deps=[dg.AssetKey(["databricks_fact_virtual"])],
             automation_condition=dg.AutomationCondition.any_deps_updated(),
             legacy_freshness_policy=dg.LegacyFreshnessPolicy(maximum_lag_minutes=1),
             compute_kind="dbt",
