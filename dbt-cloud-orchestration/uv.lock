@@ -1221,6 +1221,7 @@ version = "0.1.0"
 source = { editable = "downstream" }
 dependencies = [
     { name = "dagster" },
+    { name = "python-dotenv" },
     { name = "requests" },
 ]
 
@@ -1228,19 +1229,22 @@ dependencies = [
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "dagster", specifier = ">=1.12.8" },
-    { name = "requests" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "requests", specifier = ">=2.31.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest", specifier = ">=7.0.0" },
     { name = "ruff" },
 ]
 
