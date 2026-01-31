@@ -56,6 +56,7 @@ class PackageAwareDbtTranslator(DagsterDbtTranslator):
         return base_key
 
 
+
 def create_dbt_cloud_workspace(
     credentials: DbtCloudCredentials,
     run_config: DbtCloudRunConfig | None = None,
@@ -150,13 +151,17 @@ def create_dbt_cloud_definitions(
 
     @dbt_cloud_assets(
         workspace=workspace,
-        group_name="dbt",
         dagster_dbt_translator=custom_translator,
     )
     def my_dbt_cloud_assets(
         context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
     ):
         yield from dbt_cloud.cli(args=["build"], context=context).wait(timeout=timeout)
+
+    # Apply group_name to all specs including upstream dependencies
+    my_dbt_cloud_assets = my_dbt_cloud_assets.map_asset_specs(
+        lambda spec: spec.replace_attributes(group_name="dbt")
+    )
 
     discovered_asset_keys = {k.path[-1] for k in my_dbt_cloud_assets.keys}
     target_key = "stg_kaizen_wars__fact_virtual"
