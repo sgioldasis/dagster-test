@@ -14,6 +14,7 @@ dev = [
     "dagster-webserver",
     "dagster-dg-cli",
     "ruff",
+    "pytest",
 ]
 
 [build-system]

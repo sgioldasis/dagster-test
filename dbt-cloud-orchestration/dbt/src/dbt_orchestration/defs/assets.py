@@ -1,4 +1,7 @@
-# dbt/src/dbt/defs/assets.py
+"""Asset definitions for dbt Cloud orchestration."""
+
+from __future__ import annotations
+
 import time
 from typing import Optional, Mapping, Any
 from datetime import timedelta
@@ -11,6 +14,7 @@ from dagster import (
     FreshnessPolicy,
     JobDefinition,
     AssetKey,
+    AssetsDefinition,
 )
 from dagster_dbt.cloud_v2.asset_decorator import dbt_cloud_assets
 from dagster_dbt.cloud_v2.resources import (
@@ -22,6 +26,17 @@ from dagster_dbt.dagster_dbt_translator import DagsterDbtTranslator
 import requests
 
 from .resources import DbtCloudCredentials, DbtCloudRunConfig
+from .constants import (
+    DbtCloudRunStatus,
+    DEFAULT_KAIZEN_WARS_TARGET_KEY,
+    DEFAULT_KAIZEN_WARS_PACKAGE,
+    DEFAULT_FRESHNESS_DEADLINE_CRON,
+    DEFAULT_FRESHNESS_LOWER_BOUND_MINUTES,
+    DEFAULT_MAX_POLLING_ITERATIONS,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_RETRY_DELAY_SECONDS,
+)
+from .types import DbtCloudDefinitions
 
 
 class PackageAwareDbtTranslator(DagsterDbtTranslator):
@@ -56,10 +71,8 @@ class PackageAwareDbtTranslator(DagsterDbtTranslator):
         return base_key
 
 
-
 def create_dbt_cloud_workspace(
     credentials: DbtCloudCredentials,
-    run_config: DbtCloudRunConfig | None = None,
 ) -> DbtCloudWorkspace:
     """Create a DbtCloudWorkspace from DbtCloudCredentials resource."""
     sdk_credentials = DbtCloudSdkCredentials(
@@ -74,9 +87,77 @@ def create_dbt_cloud_workspace(
     )
 
 
+def _trigger_job_with_retry(
+    url: str,
+    headers: dict[str, str],
+    max_retries: int,
+    retry_delay: int,
+    context: dg.OpExecutionContext,
+) -> dict[str, Any]:
+    """Trigger a dbt Cloud job with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                url, headers=headers, json={"cause": "Triggered from Dagster"}, timeout=30
+            )
+            response.raise_for_status()
+            return response.json()["data"]
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                context.log.warning(
+                    f"API call failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying..."
+                )
+                time.sleep(retry_delay)
+            else:
+                context.log.error(f"API call failed after {max_retries} attempts: {e}")
+                raise
+
+
+def _poll_run_status(
+    status_url: str,
+    headers: dict[str, str],
+    polling_interval: int,
+    max_iterations: int,
+    context: dg.OpExecutionContext,
+) -> dict[str, Any]:
+    """Poll dbt Cloud run status until completion or timeout."""
+    for iteration in range(max_iterations):
+        try:
+            status_resp = requests.get(status_url, headers=headers, timeout=30)
+            status_resp.raise_for_status()
+            
+            run_data = status_resp.json()["data"]
+            status = run_data["status"]
+            
+            if DbtCloudRunStatus.is_running(status):
+                context.log.info(
+                    f"Job still running, status: {status} ({DbtCloudRunStatus(status).name})"
+                )
+                time.sleep(polling_interval)
+                continue
+            
+            if DbtCloudRunStatus.is_terminal(status):
+                context.log.info(
+                    f"Job completed with status: {status} ({DbtCloudRunStatus(status).name})"
+                )
+                return run_data
+            
+            context.log.warning(f"Unknown status: {status}")
+            time.sleep(polling_interval)
+            
+        except requests.exceptions.RequestException as e:
+            context.log.warning(f"Polling error: {e}. Retrying...")
+            time.sleep(polling_interval)
+    
+    raise TimeoutError(
+        f"Job polling timed out after {max_iterations} iterations "
+        f"(~{max_iterations * polling_interval / 60:.1f} minutes)"
+    )
+
+
 def _create_dbt_cloud_job_trigger_job(
     credentials: DbtCloudCredentials,
-    run_config: DbtCloudRunConfig | None = None,
+    run_config: Optional[DbtCloudRunConfig] = None,
 ) -> Optional[JobDefinition]:
     """Create a job for triggering dbt Cloud runs, or None if job_id not configured."""
     if not credentials.job_id:
@@ -85,9 +166,13 @@ def _create_dbt_cloud_job_trigger_job(
     timeout = (
         run_config.timeout_seconds if run_config else credentials.run_timeout_seconds
     )
+    max_retries = run_config.max_retries if run_config else DEFAULT_MAX_RETRIES
+    retry_delay = run_config.retry_delay_seconds if run_config else DEFAULT_RETRY_DELAY_SECONDS
+    polling_interval = run_config.polling_interval_seconds if run_config else 30
+    max_iterations = min(DEFAULT_MAX_POLLING_ITERATIONS, timeout // polling_interval)
 
     @op
-    def trigger_dbt_cloud_job_op(context: dg.OpExecutionContext):
+    def trigger_dbt_cloud_job_op(context) -> dict[str, Any]:
         """Trigger a specific dbt Cloud job directly via API."""
         job_id = credentials.job_id
         account_id = str(credentials.account_id)
@@ -99,32 +184,21 @@ def _create_dbt_cloud_job_trigger_job(
         url = f"{access_url}/api/v2/accounts/{account_id}/jobs/{job_id}/run/"
         headers = {"Authorization": f"Bearer {token}"}
 
-        response = requests.post(
-            url, headers=headers, json={"cause": "Triggered from Dagster"}
+        # Trigger job with retry logic
+        run_data = _trigger_job_with_retry(
+            url, headers, max_retries, retry_delay, context
         )
-        response.raise_for_status()
-
-        run_data = response.json()["data"]
         run_id = run_data["id"]
         context.log.info(f"Job triggered, run ID: {run_id}")
 
+        # Poll for completion
         status_url = f"{access_url}/api/v2/accounts/{account_id}/runs/{run_id}/"
-        polling_interval = run_config.polling_interval_seconds if run_config else 30
+        run_data = _poll_run_status(
+            status_url, headers, polling_interval, max_iterations, context
+        )
 
-        while True:
-            status_resp = requests.get(status_url, headers=headers)
-            status_resp.raise_for_status()
-
-            run_data = status_resp.json()["data"]
-            status = run_data["status"]
-
-            if status in [1, 2, 3]:
-                context.log.info(f"Job still running, status: {status}")
-                time.sleep(polling_interval)
-                continue
-
-            context.log.info(f"Job completed with status: {status}")
-            return {"run_id": run_id, "status": status, "run_data": run_data}
+        status = run_data["status"]
+        return {"run_id": run_id, "status": status, "run_data": run_data}
 
     @job(name="dbt_cloud_job_trigger")
     def dbt_cloud_job_trigger():
@@ -135,10 +209,10 @@ def _create_dbt_cloud_job_trigger_job(
 
 def create_dbt_cloud_definitions(
     credentials: DbtCloudCredentials,
-    run_config: DbtCloudRunConfig | None = None,
-) -> tuple:
+    run_config: Optional[DbtCloudRunConfig] = None,
+) -> DbtCloudDefinitions:
     """Create dbt Cloud workspace, assets, sensor, and job trigger from credentials."""
-    workspace = create_dbt_cloud_workspace(credentials, run_config)
+    workspace = create_dbt_cloud_workspace(credentials)
     dbt_cloud_job_trigger = _create_dbt_cloud_job_trigger_job(credentials, run_config)
 
     timeout = (
@@ -154,7 +228,7 @@ def create_dbt_cloud_definitions(
         dagster_dbt_translator=custom_translator,
     )
     def my_dbt_cloud_assets(
-        context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
+        context, dbt_cloud: DbtCloudWorkspace
     ):
         yield from dbt_cloud.cli(args=["build"], context=context).wait(timeout=timeout)
 
@@ -164,10 +238,10 @@ def create_dbt_cloud_definitions(
     )
 
     discovered_asset_keys = {k.path[-1] for k in my_dbt_cloud_assets.keys}
-    target_key = "stg_kaizen_wars__fact_virtual"
+    target_key = DEFAULT_KAIZEN_WARS_TARGET_KEY
     is_discovered = target_key in discovered_asset_keys
 
-    kaizen_wars_assets = []
+    kaizen_wars_assets: list[AssetsDefinition] = []
 
     if is_discovered:
 
@@ -182,8 +256,8 @@ def create_dbt_cloud_definitions(
                     deps=[dg.AssetKey(["fact_virtual"])],
                     automation_condition=dg.AutomationCondition.any_deps_updated(),
                     freshness_policy=FreshnessPolicy.cron(
-                        deadline_cron="*/1 * * * *",
-                        lower_bound_delta=timedelta(minutes=1),
+                        deadline_cron=DEFAULT_FRESHNESS_DEADLINE_CRON,
+                        lower_bound_delta=timedelta(minutes=DEFAULT_FRESHNESS_LOWER_BOUND_MINUTES),
                     ),
                 )
             return spec
@@ -201,12 +275,15 @@ def create_dbt_cloud_definitions(
             key=[target_key],
             deps=[dg.AssetKey(["fact_virtual"])],
             automation_condition=dg.AutomationCondition.any_deps_updated(),
-            legacy_freshness_policy=dg.LegacyFreshnessPolicy(maximum_lag_minutes=1),
+            freshness_policy=FreshnessPolicy.cron(
+                deadline_cron=DEFAULT_FRESHNESS_DEADLINE_CRON,
+                lower_bound_delta=timedelta(minutes=DEFAULT_FRESHNESS_LOWER_BOUND_MINUTES),
+            ),
             compute_kind="dbt",
             group_name="dbt",
         )
         def stg_kaizen_wars__fact_virtual(
-            context: dg.AssetExecutionContext, dbt_cloud: DbtCloudWorkspace
+            context, dbt_cloud: DbtCloudWorkspace
         ):
             """Formally managed dbt asset for Kaizen Wars fact_virtual (Explicit Definition)."""
             yield from dbt_cloud.cli(
@@ -217,21 +294,17 @@ def create_dbt_cloud_definitions(
 
     dbt_cloud_polling_sensor = build_dbt_cloud_polling_sensor(workspace=workspace)
 
-    return (
-        my_dbt_cloud_assets,
-        dbt_cloud_polling_sensor,
-        workspace,
-        dbt_cloud_job_trigger,
-        kaizen_wars_assets,
+    return DbtCloudDefinitions(
+        assets=my_dbt_cloud_assets,
+        sensor=dbt_cloud_polling_sensor,
+        workspace=workspace,
+        job_trigger=dbt_cloud_job_trigger,
+        additional_assets=kaizen_wars_assets,
     )
 
 
 __all__ = [
-    "DbtCloudCredentials",
-    "DbtCloudRunConfig",
+    "PackageAwareDbtTranslator",
     "create_dbt_cloud_definitions",
-    "workspace",
-    "my_dbt_cloud_assets",
-    "dbt_cloud_polling_sensor",
-    "kaizen_wars_assets",
+    "create_dbt_cloud_workspace",
 ]

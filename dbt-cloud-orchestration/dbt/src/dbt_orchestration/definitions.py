@@ -8,6 +8,11 @@ load_dotenv()
 
 from .defs.assets import create_dbt_cloud_definitions
 from .defs.resources import DbtCloudCredentials, DbtCloudRunConfig
+from .defs.constants import (
+    DEFAULT_MAX_CONCURRENT_RUNS,
+    DEFAULT_RUN_TIMEOUT_SECONDS,
+    DEFAULT_RETRY_FAILED_RUNS,
+)
 
 
 automation_sensor = AutomationConditionSensorDefinition(
@@ -17,8 +22,12 @@ automation_sensor = AutomationConditionSensorDefinition(
 )
 
 dbt_cloud_run_config = DbtCloudRunConfig(
-    max_concurrent_runs=int(EnvVar("DBT_CLOUD_MAX_CONCURRENT_RUNS").get_value() or "3"),
-    timeout_seconds=int(EnvVar("DBT_CLOUD_RUN_TIMEOUT_SECONDS").get_value() or "1800"),
+    max_concurrent_runs=int(
+        EnvVar("DBT_CLOUD_MAX_CONCURRENT_RUNS").get_value() or DEFAULT_MAX_CONCURRENT_RUNS
+    ),
+    timeout_seconds=int(
+        EnvVar("DBT_CLOUD_RUN_TIMEOUT_SECONDS").get_value() or DEFAULT_RUN_TIMEOUT_SECONDS
+    ),
     retry_failed_runs=(EnvVar("DBT_CLOUD_RETRY_FAILED").get_value() or "").lower()
     == "true",
 )
@@ -32,7 +41,7 @@ dbt_cloud_credentials = DbtCloudCredentials(
     environment_id=int(EnvVar("DBT_CLOUD_ENVIRONMENT_ID").get_value() or "0"),
     job_id=int(dbt_cloud_job_id) if dbt_cloud_job_id else None,
     run_timeout_seconds=int(
-        EnvVar("DBT_CLOUD_RUN_TIMEOUT_SECONDS").get_value() or "1800"
+        EnvVar("DBT_CLOUD_RUN_TIMEOUT_SECONDS").get_value() or DEFAULT_RUN_TIMEOUT_SECONDS
     ),
 )
 
@@ -43,14 +52,14 @@ fact_virtual_source = SourceAsset(
 )
 
 
-# Declare assets and resources at module level for static analysis
-(
-    my_dbt_cloud_assets,
-    dbt_cloud_polling_sensor,
-    workspace,
-    dbt_cloud_job_trigger,
-    kaizen_wars_assets,
-) = create_dbt_cloud_definitions(dbt_cloud_credentials, dbt_cloud_run_config)
+# Create dbt Cloud definitions
+dbt_definitions = create_dbt_cloud_definitions(dbt_cloud_credentials, dbt_cloud_run_config)
+
+my_dbt_cloud_assets = dbt_definitions.assets
+dbt_cloud_polling_sensor = dbt_definitions.sensor
+workspace = dbt_definitions.workspace
+dbt_cloud_job_trigger = dbt_definitions.job_trigger
+kaizen_wars_assets = dbt_definitions.additional_assets
 
 defs = dg.Definitions(
     assets=[
@@ -62,9 +71,11 @@ defs = dg.Definitions(
     resources={
         "dbt_cloud": workspace,
     },
+    jobs=[dbt_cloud_job_trigger] if dbt_cloud_job_trigger else [],
 )
 
 
+# Kept for backward compatibility with tools that expect a function attribute
 def dbt_defs() -> dg.Definitions:
     """Wrapper function for tools that expect a function attribute."""
     return defs

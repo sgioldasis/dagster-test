@@ -1,8 +1,14 @@
-# dbt/src/dbt/defs/resources.py
 """Resources for the dbt code location."""
 
 import dagster as dg
 from pydantic import Field
+
+from .constants import (
+    DEFAULT_MAX_CONCURRENT_RUNS,
+    DEFAULT_POLLING_INTERVAL_SECONDS,
+    DEFAULT_RETRY_FAILED_RUNS,
+    DEFAULT_RUN_TIMEOUT_SECONDS,
+)
 
 
 class DbtCloudCredentials(dg.ConfigurableResource):
@@ -19,10 +25,8 @@ class DbtCloudCredentials(dg.ConfigurableResource):
         default=None, description="dbt Cloud job ID for triggering"
     )
     run_timeout_seconds: int = Field(
-        default=600, description="Timeout for dbt Cloud run operations"
-    )
-    polling_interval_seconds: int = Field(
-        default=30, description="Polling interval for run status checks"
+        default=DEFAULT_RUN_TIMEOUT_SECONDS,
+        description="Timeout for dbt Cloud run operations",
     )
 
 
@@ -30,12 +34,31 @@ class DbtCloudRunConfig(dg.ConfigurableResource):
     """Configuration for dbt Cloud run behavior."""
 
     max_concurrent_runs: int = Field(
-        default=3, description="Max concurrent runs per job"
+        default=DEFAULT_MAX_CONCURRENT_RUNS,
+        description="Max concurrent runs per job",
     )
-    timeout_seconds: int = Field(default=1800, description="Default run timeout")
-    retry_failed_runs: bool = Field(default=False, description="Auto-retry failed runs")
+    timeout_seconds: int = Field(
+        default=DEFAULT_RUN_TIMEOUT_SECONDS,
+        description="Default run timeout",
+    )
+    retry_failed_runs: bool = Field(
+        default=DEFAULT_RETRY_FAILED_RUNS,
+        description="Auto-retry failed runs",
+    )
     notify_on_failure: str | None = Field(
         default=None, description="Email to notify on failure"
+    )
+    polling_interval_seconds: int = Field(
+        default=DEFAULT_POLLING_INTERVAL_SECONDS,
+        description="Polling interval for run status checks",
+    )
+    max_retries: int = Field(
+        default=3,
+        description="Max retries for API calls",
+    )
+    retry_delay_seconds: int = Field(
+        default=5,
+        description="Delay between retries in seconds",
     )
 
 
