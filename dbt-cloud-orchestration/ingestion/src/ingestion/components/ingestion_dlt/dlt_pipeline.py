@@ -13,8 +13,9 @@ from typing import Iterator
 import dlt
 import pandas as pd
 from dlt.common.typing import TDataItem
+from dlt.sources.sql_database import sql_table
 
-from dagster import EnvVar
+from ingestion.config import get_settings
 
 
 @dlt.resource(name="dlt_fact_virtual", write_disposition="replace")
@@ -27,10 +28,15 @@ def raw_fact_virtual_csv() -> Iterator[TDataItem]:
     Yields:
         Dictionary records from the CSV file.
     """
-    csv_data_path = EnvVar("CSV_DATA_PATH").get_value()
-    if csv_data_path is None:
-        raise ValueError("CSV_DATA_PATH environment variable is not set")
-    csv_path = Path(csv_data_path) / "raw_fact_virtual.csv"
+    settings = get_settings()
+    csv_path = settings.csv_data_path / "raw_fact_virtual.csv"
+    
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"CSV file not found: {csv_path}. "
+            f"Ensure CSV_DATA_PATH is set correctly (current: {settings.csv_data_path})"
+        )
+    
     df = pd.read_csv(csv_path)
     yield from df.to_dict(orient="records")
 
@@ -54,9 +60,26 @@ def fact_virtual_postgres() -> Iterator[TDataItem]:
     Yields:
         Dictionary records from the PostgreSQL table.
 
-    Note:
-        This resource uses the postgres connection defined in the pipeline.
+    Raises:
+        ConnectionError: If unable to connect to PostgreSQL.
     """
-    # The source will be configured with postgres credentials at runtime
-    # This is a placeholder that will be used by dlt's sql_table source
-    yield from []
+    settings = get_settings()
+    
+    # Use dlt's sql_table source to read from PostgreSQL
+    table = sql_table(
+        credentials=settings.postgres_connection_string,
+        schema="public",
+        table="fact_virtual",
+    )
+    
+    # Yield all records from the table
+    yield from table
+
+
+@dlt.source
+def postgres_source():
+    """DLT source for PostgreSQL table ingestion.
+
+    This source provides resources for loading data from PostgreSQL tables.
+    """
+    yield fact_virtual_postgres

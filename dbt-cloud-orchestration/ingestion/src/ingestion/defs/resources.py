@@ -37,7 +37,7 @@ class DatabricksCredentials(dg.ConfigurableResource):
 
     Attributes:
         host: The Databricks workspace host (e.g., adb-xxx.azuredatabricks.net)
-        token: Personal access token for authentication
+        token: Personal access token for authentication (uses DATABRICKS_TOKEN env var)
         warehouse_id: SQL warehouse ID (used to construct http_path)
         http_path: Direct JDBC/ODBC HTTP path (alternative to warehouse_id)
         catalog: Unity Catalog name (default: "test")
@@ -47,9 +47,9 @@ class DatabricksCredentials(dg.ConfigurableResource):
     Example:
         ```python
         databricks = DatabricksCredentials(
-            host="adb-123.azuredatabricks.net",
+            host=dg.EnvVar("DATABRICKS_HOST"),
             token=dg.EnvVar("DATABRICKS_TOKEN"),
-            warehouse_id="abc123def456",
+            warehouse_id=dg.EnvVar("DATABRICKS_WAREHOUSE_ID"),
             catalog="production",
             schema_name="analytics",
         )
@@ -60,7 +60,8 @@ class DatabricksCredentials(dg.ConfigurableResource):
         description="Databricks workspace host (e.g., adb-xxx.azuredatabricks.net)"
     )
     token: str = Field(
-        description="Databricks personal access token"
+        default=dg.EnvVar("DATABRICKS_TOKEN"),
+        description="Databricks personal access token (from DATABRICKS_TOKEN env var)"
     )
     warehouse_id: str | None = Field(
         default=None,

@@ -31,95 +31,88 @@ Architecture:
     └──────────────────────────┘
 """
 
-from pathlib import Path
+# Standard library
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+from pathlib import Path
+
+# Third party
 from databricks.sdk.service.jobs import RunResultState
 
+# Dagster
 import dagster as dg
 from dagster import (
+    AssetExecutionContext,
+    AssetKey,
     AutomationCondition,
     AutomationConditionSensorDefinition,
-    SensorDefinition,
-    RunRequest,
-    AssetSelection,
-    SkipReason,
-    RunsFilter,
     EnvVar,
     Field,
-    AssetExecutionContext,
     build_last_update_freshness_checks,
-    AssetKey,
 )
-from dagster._core.storage.dagster_run import DagsterRunStatus
 from dagster.components import build_component_defs
 
+# Local imports
+from ingestion.config import get_settings
 from ingestion.defs.resources import DatabricksCredentials, PostgresCredentials
 
-# Load environment variables from .env file for local development
-load_dotenv()
 
-# =============================================================================
-# SENSORS
-# =============================================================================
-
-ingestion_automation_sensor = AutomationConditionSensorDefinition(
-    name="default_automation_sensor",
-    target=dg.AssetSelection.all(),
-)
-"""Default automation sensor that triggers assets based on their automation conditions.
-
-This sensor monitors all assets with AutomationCondition.eager() and triggers
-them when their upstream dependencies are updated. It runs continuously and
-checks for materialization events that would satisfy eager conditions.
-"""
-
-
-def _is_run_in_progress(context: dg.SensorEvaluationContext) -> bool:
-    """Check if there's already an ingestion run in progress.
-
-    This prevents multiple concurrent runs of the same pipeline, which could
-    cause resource contention or data consistency issues.
-
-    Args:
-        context: The sensor evaluation context with access to Dagster instance
+def _build_sensors() -> list[dg.SensorDefinition]:
+    """Build all sensors for the ingestion pipeline.
 
     Returns:
-        True if there's at least one run in STARTED or QUEUED status
+        List of sensor definitions.
     """
-    instance = context.instance
-    runs = instance.get_runs(
-        filters=RunsFilter(
-            statuses=[DagsterRunStatus.STARTED, DagsterRunStatus.QUEUED],
-        ),
-        limit=1,
+    automation_sensor = AutomationConditionSensorDefinition(
+        name="default_automation_sensor",
+        target=dg.AssetSelection.all(),
     )
-    return len(runs) > 0
+
+    # Build freshness sensor for visibility in lineage
+    freshness_sensor = dg.build_sensor_for_freshness_checks(
+        name="freshness_sensor",
+        minimum_interval_seconds=30,
+        freshness_checks=_build_freshness_checks(),
+    )
+
+    return [automation_sensor, freshness_sensor]
 
 
-csv_ingestion_sensor = SensorDefinition(
-    name="csv_ingestion_every_2_min",
-    asset_selection=AssetSelection.assets(dg.AssetKey("csv_fact_virtual")),
-    minimum_interval_seconds=120,
-    evaluation_fn=lambda context: (
-        SkipReason("An ingestion run is already in progress")
-        if _is_run_in_progress(context)
-        else RunRequest(partition_key=None)
-    ),
-)
-"""Sensor that triggers csv_fact_virtual ingestion every 2 minutes.
+def _build_schedules() -> list[dg.ScheduleDefinition]:
+    """Build all schedules for the ingestion pipeline.
 
-This sensor provides an alternative to the automation sensor for periodic
-execution. It includes a safeguard to skip if a run is already in progress.
+    Returns:
+        List of schedule definitions.
+    """
+    # Schedule to trigger csv_fact_virtual every 2 minutes
+    csv_fact_virtual_schedule = dg.ScheduleDefinition(
+        name="csv_fact_virtual_schedule",
+        target=dg.AssetSelection.keys("csv_fact_virtual"),
+        cron_schedule="*/2 * * * *",  # Every 2 minutes
+        description="Trigger csv_fact_virtual asset every 2 minutes",
+    )
 
-Note: Currently using AutomationCondition.eager() instead, but this sensor
-remains available for explicit scheduling scenarios.
-"""
+    return [csv_fact_virtual_schedule]
 
 
-# =============================================================================
-# ASSETS
-# =============================================================================
+def _build_freshness_checks() -> list:
+    """Build freshness checks for monitoring data quality.
+
+    Returns:
+        List of freshness check definitions.
+    """
+    csv_freshness = build_last_update_freshness_checks(
+        assets=[AssetKey("csv_fact_virtual")],
+        lower_bound_delta=timedelta(minutes=1),
+        severity=dg.AssetCheckSeverity.ERROR,
+    )
+
+    fact_freshness = build_last_update_freshness_checks(
+        assets=[AssetKey("fact_virtual")],
+        lower_bound_delta=timedelta(minutes=1),
+        severity=dg.AssetCheckSeverity.ERROR,
+    )
+
+    return list(csv_freshness) + list(fact_freshness)
 
 
 @dg.asset(
@@ -155,23 +148,12 @@ def databricks_run_databricks_ingestion_job_asset(
     within Dagster. It submits a job run, polls for completion, and returns
     the execution results.
 
-    Usage:
-        This asset can be triggered manually with specific date ranges:
-        ```
-        dagster asset materialize --select run_databricks_ingestion_job \
-          --config '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
-        ```
-
     Args:
         context: Asset execution context for logging and config access
         databricks: Configured Databricks credentials resource
 
     Returns:
         Dictionary with run_id and status of the Databricks job
-
-    Raises:
-        TimeoutError: If the job doesn't complete within 10 minutes
-        RuntimeError: If the job fails or returns an error
     """
     config = context.op_config or {}
     start_date = config.get("start_date") or (
@@ -238,46 +220,29 @@ def databricks_run_databricks_ingestion_job_asset(
         )
 
 
-# =============================================================================
-# FRESHNESS CHECKS
-# =============================================================================
+def _build_resources() -> dict[str, dg.ResourceDefinition]:
+    """Build all resources for the ingestion pipeline.
 
-# Freshness checks monitor when assets were last materialized and raise
-# alerts if they exceed the expected update frequency.
+    Uses settings from config.py for validation and defaults.
 
-csv_fact_virtual_freshness_checks = build_last_update_freshness_checks(
-    assets=[AssetKey("csv_fact_virtual")],
-    lower_bound_delta=timedelta(minutes=1),
-    severity=dg.AssetCheckSeverity.ERROR,
-)
-"""Freshness check for csv_fact_virtual asset.
+    Returns:
+        Dictionary of resource definitions.
+    """
+    settings = get_settings()
 
-Fails if the asset hasn't been updated in the last 1 minute.
-This is aggressive for demonstration - in production, use longer windows
-based on your actual data refresh SLAs.
-"""
+    databricks_resource = DatabricksCredentials(
+        host=EnvVar("DATABRICKS_HOST"),
+        warehouse_id=settings.databricks_warehouse_id,
+        http_path=settings.databricks_http_path,
+        catalog=settings.databricks_catalog,
+        schema_name=settings.databricks_schema,
+        notebook_job_id=settings.databricks_notebook_job_id,
+    )
 
-fact_virtual_freshness_checks = build_last_update_freshness_checks(
-    assets=[AssetKey("fact_virtual")],
-    lower_bound_delta=timedelta(minutes=1),
-    severity=dg.AssetCheckSeverity.ERROR,
-)
-"""Freshness check for fact_virtual asset.
-
-Note: This check is on the Sling-managed asset. The freshness policy
-configured in the component provides additional monitoring with warn/fail
-thresholds.
-"""
-
-# Combine all freshness checks for registration
-all_freshness_checks = list(csv_fact_virtual_freshness_checks) + list(
-    fact_virtual_freshness_checks
-)
-
-
-# =============================================================================
-# DEFINITIONS
-# =============================================================================
+    return {
+        "databricks": databricks_resource,
+        "postgres": PostgresCredentials(),
+    }
 
 
 def get_definitions() -> dg.Definitions:
@@ -293,47 +258,25 @@ def get_definitions() -> dg.Definitions:
     Returns:
         Definitions object containing all assets, resources, and sensors
     """
-    # Configure Databricks resource from environment variables
-    databricks_resource = DatabricksCredentials(
-        host=EnvVar("DATABRICKS_HOST").get_value() or "",
-        token=EnvVar("DATABRICKS_TOKEN").get_value() or "",
-        warehouse_id=EnvVar("DATABRICKS_WAREHOUSE_ID").get_value(),
-        http_path=EnvVar("DATABRICKS_HTTP_PATH").get_value(),
-        catalog=EnvVar("DATABRICKS_CATALOG").get_value() or "test",
-        schema_name=EnvVar("DATABRICKS_SCHEMA").get_value() or "main",
-        notebook_job_id=EnvVar("DATABRICKS_NOTEBOOK_JOB_ID").get_value(),
-    )
-
     # Build component definitions from the components/ directory
-    # This discovers and loads all YAML-based components (Sling replications)
     component_defs = build_component_defs(Path(__file__).parent / "components")
 
-    # Create freshness sensor for visibility in lineage
-    freshness_sensor = dg.build_sensor_for_freshness_checks(
-        name="freshness_sensor",
-        minimum_interval_seconds=30,
-        freshness_checks=all_freshness_checks,
-    )
+    # Build freshness checks
+    freshness_checks = _build_freshness_checks()
 
-    # Merge component definitions with programmatic definitions and source assets
+    # Merge component definitions with programmatic definitions
     merged_defs = dg.Definitions.merge(
         component_defs,
         dg.Definitions(
-            assets=[
-                databricks_run_databricks_ingestion_job_asset,
-            ],
-            asset_checks=all_freshness_checks,
-            resources={
-                "databricks": databricks_resource,
-                "postgres": PostgresCredentials(),
-            },
-            sensors=[
-                csv_ingestion_sensor,
-                ingestion_automation_sensor,
-                freshness_sensor,
-            ],
+            assets=[databricks_run_databricks_ingestion_job_asset],
+            asset_checks=freshness_checks,
+            resources=_build_resources(),
+            sensors=_build_sensors(),
         ),
     )
+
+    # Build schedules
+    schedules = _build_schedules()
 
     return dg.Definitions(
         assets=merged_defs.assets,
@@ -341,7 +284,7 @@ def get_definitions() -> dg.Definitions:
         sensors=merged_defs.sensors,
         asset_checks=merged_defs.asset_checks,
         jobs=merged_defs.jobs,
-        schedules=merged_defs.schedules,
+        schedules=schedules,
     )
 
 
