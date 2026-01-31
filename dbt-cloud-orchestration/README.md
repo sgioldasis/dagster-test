@@ -9,8 +9,8 @@ A Dagster + dbt Cloud orchestration monorepo with three independent code locatio
 From the monorepo root:
 
 ```bash
-uv sync --all-packages --all-groups
-dg dev --workspace workspace.yaml
+kc dgdev # Run dagster dev
+kc test # Run tests
 ```
 
 Open http://localhost:3000 in your browser.
@@ -22,15 +22,18 @@ Each sub-project can be developed independently:
 ```bash
 # Ingestion team
 cd ingestion/
-dg dev
+kc dgdev # Run dagster dev
+kc test # Run tests
 
 # DBT team
 cd dbt/
-dg dev
+kc dgdev # Run dagster dev
+kc test # Run tests
 
 # Downstream team
 cd downstream/
-dg dev
+kc dgdev # Run dagster dev
+kc test # Run tests
 ```
 
 ## Project Structure
