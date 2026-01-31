@@ -11,6 +11,7 @@ dependencies = [
 dev = [
     "dagster-webserver",
     "dagster-dg-cli",
+    "pytest>=7.0.0",
     "ruff",
 ]
 
@@ -27,3 +28,14 @@ members = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "ingestion/tests",
+    "dbt/tests",
+    "downstream/tests",
+]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"

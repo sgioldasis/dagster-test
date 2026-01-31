@@ -987,6 +987,7 @@ dependencies = [
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
@@ -997,6 +998,7 @@ requires-dist = [{ name = "duckdb", specifier = ">=1.4.3" }]
 dev = [
     { name = "dagster-dg-cli" },
     { name = "dagster-webserver" },
+    { name = "pytest", specifier = ">=7.0.0" },
     { name = "ruff" },
 ]
 
