@@ -36,8 +36,8 @@ dbt_cloud_credentials = DbtCloudCredentials(
     ),
 )
 
-databricks_fact_virtual_source = SourceAsset(
-    key="databricks_fact_virtual",
+fact_virtual_source = SourceAsset(
+    key="fact_virtual",
     description="Asset from ingestion code location",
     group_name="ingestion",
 )
@@ -56,7 +56,7 @@ defs = dg.Definitions(
     assets=[
         my_dbt_cloud_assets,
         *kaizen_wars_assets,
-        databricks_fact_virtual_source,
+        fact_virtual_source,
     ],
     sensors=[dbt_cloud_polling_sensor, automation_sensor],
     resources={

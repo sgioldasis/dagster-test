@@ -19,7 +19,7 @@
 #   For production, consider "incremental" mode with an update_key.
 #
 # Dagster Integration:
-#   This replication creates a Dagster asset named "databricks_fact_virtual"
+#   This replication creates a Dagster asset named "fact_virtual"
 #   with an upstream dependency on "csv_fact_virtual".
 #
 # Key Concepts:
@@ -56,7 +56,7 @@ streams:
   # Target: Databricks table (will use the configured catalog and schema)
   #
   # Dagster Metadata:
-  #   - asset_key: "databricks_fact_virtual" - Name in Dagster asset graph
+  #   - asset_key: "fact_virtual" - Name in Dagster asset graph
   #   - upstream_assets: ["csv_fact_virtual"] - Dependency relationship
   #     This tells Dagster that csv_fact_virtual must be materialized first.
   #
@@ -64,7 +64,7 @@ streams:
   #   csv_fact_virtual (CSV → Postgres)
   #         │
   #         ▼ (upstream_assets dependency)
-  #   databricks_fact_virtual (Postgres → Databricks)
+  #   fact_virtual (Postgres → Databricks)
   #
   # IMPORTANT: These fields must be at the stream level (NOT under 'config')
   # because dagster-sling wraps them as {"name": stream, "config": {...}}
@@ -80,7 +80,7 @@ streams:
     # Dagster-specific metadata (must be at stream level, NOT under 'config')
     meta:
       dagster:
-        asset_key: "databricks_fact_virtual"
+        asset_key: "fact_virtual"
         # upstream_assets creates a dependency in Dagster's asset graph.
         # This ensures the CSV ingestion completes before this replication runs.
         upstream_assets: ["csv_fact_virtual"]

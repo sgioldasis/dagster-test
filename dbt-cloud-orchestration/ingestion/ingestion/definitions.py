@@ -21,9 +21,9 @@ Architecture:
     └─────────────────┘
          │
          ▼
-    ┌───────────────────────┐
-    │ databricks_fact_virtual│ (Sling: PostgreSQL → Databricks)
-    └───────────────────────┘
+    ┌────────────────┐
+    │ fact_virtual   │ (Sling: PostgreSQL → Databricks)
+    └────────────────┘
          │
          ▼
     ┌──────────────────────────┐
@@ -257,12 +257,12 @@ This is aggressive for demonstration - in production, use longer windows
 based on your actual data refresh SLAs.
 """
 
-databricks_fact_virtual_freshness_checks = build_last_update_freshness_checks(
-    assets=[AssetKey("databricks_fact_virtual")],
+fact_virtual_freshness_checks = build_last_update_freshness_checks(
+    assets=[AssetKey("fact_virtual")],
     lower_bound_delta=timedelta(minutes=1),
     severity=dg.AssetCheckSeverity.ERROR,
 )
-"""Freshness check for databricks_fact_virtual asset.
+"""Freshness check for fact_virtual asset.
 
 Note: This check is on the Sling-managed asset. The freshness policy
 configured in the component provides additional monitoring with warn/fail
@@ -271,7 +271,7 @@ thresholds.
 
 # Combine all freshness checks for registration
 all_freshness_checks = list(csv_fact_virtual_freshness_checks) + list(
-    databricks_fact_virtual_freshness_checks
+    fact_virtual_freshness_checks
 )
 
 

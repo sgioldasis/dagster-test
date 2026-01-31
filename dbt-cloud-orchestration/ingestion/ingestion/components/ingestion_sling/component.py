@@ -162,8 +162,8 @@ class IngestionSlingTranslator(DagsterSlingTranslator):
             )
             kinds = {"sling", "csv", "postgres"}  # Tags for UI visualization
 
-        elif asset_key_str == '["databricks_fact_virtual"]':
-            # PostgreSQL → Databricks ingestion asset
+        elif asset_key_str == '["fact_virtual"]':
+            # PostgreSQL → Databricks ingestion asset (renamed from databricks_fact_virtual)
             # Longer window since this involves network transfer to Databricks
             freshness_policy = dg.FreshnessPolicy.time_window(
                 fail_window=timedelta(minutes=5),

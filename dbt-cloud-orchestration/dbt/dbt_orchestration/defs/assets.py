@@ -172,8 +172,9 @@ def create_dbt_cloud_definitions(
             )
 
             if spec.key.path[-1] == target_key:
+                # Set dependency to fact_virtual from ingestion code location
                 return spec.replace_attributes(
-                    deps=[*spec.deps, dg.AssetKey(["databricks_fact_virtual"])],
+                    deps=[dg.AssetKey(["fact_virtual"])],
                     automation_condition=dg.AutomationCondition.any_deps_updated(),
                     freshness_policy=FreshnessPolicy.cron(
                         deadline_cron="*/1 * * * *",
@@ -193,7 +194,7 @@ def create_dbt_cloud_definitions(
 
         @asset(
             key=[target_key],
-            deps=[dg.AssetKey(["databricks_fact_virtual"])],
+            deps=[dg.AssetKey(["fact_virtual"])],
             automation_condition=dg.AutomationCondition.any_deps_updated(),
             legacy_freshness_policy=dg.LegacyFreshnessPolicy(maximum_lag_minutes=1),
             compute_kind="dbt",
