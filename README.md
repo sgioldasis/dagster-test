@@ -1,183 +1,317 @@
-# Project description
+# Dagster Test Projects
 
-This project is a testbed for experimenting with Dagster pipelines and local development workflows using Devbox. It provides example Dagster jobs, component configurations, and scripts to streamline pipeline development and iteration. The repository demonstrates how to ingest data from CSV files, orchestrate data pipelines with Dagster, and integrate with dbt for data transformation. It also includes instructions for setting up the environment, running the Dagster UI, and managing data with tools like Sling and Podman. The project is ideal for learning and prototyping modern data engineering workflows in a local environment.
+A monorepo containing multiple Dagster-based data pipeline projects for experimenting with different integrations and patterns. This repository serves as a testbed for modern data engineering workflows using Dagster, dbt, Databricks, DLT, Sling, and more.
+
+## Projects Overview
+
+This repository contains the following independent projects:
+
+| Project | Description | Python Version |
+|---------|-------------|----------------|
+| [`dbt-cloud-orchestration/`](dbt-cloud-orchestration/) | Multi-team dbt Cloud orchestration with ingestion, dbt Cloud integration, and downstream analytics | 3.10 - 3.14 |
+| [`dbx-project/`](dbx-project/) | Dagster + Databricks integration with Sling ingestion and dbt transformations | 3.10 - 3.13 |
+| [`dlt-project/`](dlt-project/) | Dagster + DLT (Data Load Tool) integration for data ingestion | 3.9 - 3.13 |
+| [`dbt-cloud/`](dbt-cloud/) | Simple dbt Cloud integration example | - |
+| [`sling-project/`](sling-project/) | Dagster + Sling integration for data replication | - |
 
 ## Prerequisites
-- Environment variables
-    - In your .bashrc or .zshrc add the following:
-    ```
-    export DATABRICKS_TOKEN=<your databricks token>
-    export SQL_SERVER_PASSWORD=<your sql server password>
-    ```
-- Install Devbox (https://www.jetify.com/devbox)
 
+### Required
 
-## Setup (quick)
+- **[Devbox](https://www.jetify.com/devbox)** - Development environment management (includes Python, uv, PostgreSQL, and other tools)
 
-1. Enter devbox shell:
-   ```bash
-   devbox shell
-   ```
+### Optional (for specific projects)
 
-2. (optional) Initialize Podman VM (one-time):
-   ```bash
-   podman machine init
-   ```
+- **Databricks account** - For Databricks-related features
+- **dbt Cloud account** - For dbt Cloud orchestration features
+- **PostgreSQL** - Managed automatically via Devbox
 
-3. Run Dagster UI:
-   ```bash
-   cd my-project
-   dg dev
-   ```
-   After that you can view the Dagster UI by pointing your browser at http://127.0.0.1:3000
+### Environment Variables
 
-
-## Repository layout
-- dagster_test/ — Dagster pipelines, solids/ops, and jobs
-- tests/ — unit tests for pipeline code
-- requirements.txt — Python dependencies
-
-## Useful commands
-
-### Postgres
+Some projects require environment variables. Add these to your `.bashrc` or `.zshrc` if needed:
 
 ```bash
-# Create the jaffle_shop database
-createdb jaffle_shop
+# Databricks (for dbx-project and dbt-cloud-orchestration)
+export DATABRICKS_TOKEN=<your_databricks_token>
+export DATABRICKS_HOST=<your_databricks_host>
 
-# Connect to the jaffle_shop database
-psql -h localhost -d jaffle_shop
+# SQL Server (for legacy connections)
+export SQL_SERVER_PASSWORD=<your_sql_server_password>
 ```
 
-### Sling
+## Quick Start
 
-```bash
-# Setup POSTGRES_CONN connection
-sling conns set POSTGRES_CONN url="postgresql://localhost:5432/jaffle_shop?sslmode=disable"
-
-# Setup SQL_SERVER connection
-sling conns set SQL_SERVER type=sqlserver host=savas-sqlserver.database.windows.net port=1433 database=TestDB user=sqladminuser password=$SQL_SERVER_PASSWORD sslmode=
-
-# 6:40PM INF connection `SQL_SERVER` has been set in /Users/s.gioldasis-si/.sling/env.yaml. Please test with `sling conns test SQL_SERVER`
-
-# Test SQL_SERVER connection
-sling conns test SQL_SERVER
-# 6:40PM INF success!
-
-# List connections
-sling conns list
-# To see the connections info
-cat ~/.sling/env.yaml 
-
-# Load data from local CSV files into PostgreSQL
-sling run \
-  --src-conn "file://data/raw_customers.csv" \
-  --tgt-conn POSTGRES_CONN \
-  --tgt-object public.raw_customers
-
-sling run \
-  --src-conn "file://data/raw_orders.csv" \
-  --tgt-conn POSTGRES_CONN \
-  --tgt-object public.raw_orders
-
-sling run \
-  --src-conn "file://data/raw_payments.csv" \
-  --tgt-conn POSTGRES_CONN \
-  --tgt-object public.raw_payments
-
-# Load data from local CSV files into SQL Server
-sling run \
-  --src-conn "file://data/raw_customers.csv" \
-  --tgt-conn SQL_SERVER \
-  --tgt-object dbo.raw_customers
-
-sling run \
-  --src-conn "file://data/raw_orders.csv" \
-  --tgt-conn SQL_SERVER \
-  --tgt-object dbo.raw_orders
-
-sling run \
-  --src-conn "file://data/raw_payments.csv" \
-  --tgt-conn SQL_SERVER \
-  --tgt-object dbo.raw_payments
-
-```
-
-### Podman
-
-```bash
-#This command downloads the necessary files and creates a lightweight Linux VM for Podman to use. You only need to do this once.
-podman machine init
-```
-
-
-## Authoring
+### 1. Enter Devbox Shell
 
 ```bash
 devbox shell
-uvx create-dagster@latest project dlt-project
+```
+
+This will:
+- Activate the Python virtual environment
+- Start PostgreSQL automatically
+- Install required dependencies
+- Set up the `kc` alias for task commands
+
+### 2. Run a Project
+
+Each project has its own setup. See the project-specific README files for details.
+
+**Example - Run dbt-cloud-orchestration:**
+
+```bash
+# Navigate to the project
+cd dbt-cloud-orchestration
+
+# Copy environment variables
+cp .env.example .env
+# Edit .env with your credentials
+
+# Run all code locations together
+task dev -- .
+```
+
+## Task Commands (kc)
+
+The repository includes a Taskfile with common commands:
+
+```bash
+# List all available tasks
+kc
+
+# Sync dependencies for a project
+kc sync -- <project-folder>
+# Example: kc sync -- dbt-cloud-orchestration
+
+# Run Dagster dev server
+kc dev -- <project-folder>
+# Example: kc dev -- dbx-project
+
+# Run tests
+kc test -- <project-folder>
+# Example: kc test -- dlt-project
+
+# PostgreSQL helpers
+kc pg-prepare    # Setup PostgreSQL and load jaffle_shop data
+kc pg-cli        # Open PostgreSQL CLI
+
+# DuckDB UI (for dbx-project)
+kc ddb
+```
+
+## Project Structure
+
+```
+dagster-test/                          # Repository Root
+├── .devbox/                           # Devbox configuration and data
+├── dbt-cloud-orchestration/           # Multi-team dbt Cloud orchestration
+│   ├── ingestion/                     # Team 1: Data ingestion (Sling/DLT)
+│   ├── dbt/                           # Team 2: dbt Cloud integration
+│   ├── downstream/                    # Team 3: Downstream analytics
+│   └── data/                          # Source CSV files
+├── dbx-project/                       # Databricks integration project
+│   ├── src/dbx_project/               # Source code
+│   ├── dbt/jdbt/                      # dbt project
+│   └── data/                          # Sample data
+├── dlt-project/                       # DLT integration project
+│   ├── src/dlt_project/               # Source code
+│   └── dbt/jdbt/                      # dbt project
+├── dbt-cloud/                         # Simple dbt Cloud example
+├── sling-project/                     # Sling integration example
+├── devbox.json                        # Devbox configuration
+├── Taskfile.yml                       # Common task definitions
+└── requirements.txt                   # Global Python dependencies
+```
+
+## Database Connections
+
+### PostgreSQL (Managed by Devbox)
+
+PostgreSQL is automatically started when you enter the devbox shell.
+
+```bash
+# Create a database
+createdb jaffle_shop
+
+# Connect to database
+psql -h localhost -d jaffle_shop
+
+# Or use the task command
+kc pg-cli
+```
+
+### Sling Connections
+
+```bash
+# Setup PostgreSQL connection
+sling conns set POSTGRES_CONN url="postgresql://localhost:5432/jaffle_shop?sslmode=disable"
+
+# Test connection
+sling conns test POSTGRES_CONN
+
+# List connections
+sling conns list
+```
+
+## Project Details
+
+### dbt-cloud-orchestration
+
+The most complex project demonstrating multi-team collaboration:
+
+- **Ingestion Team**: CSV → PostgreSQL → Databricks using Sling
+- **dbt Team**: dbt Cloud integration for transformations
+- **Downstream Team**: Analytics assets consuming dbt Cloud outputs
+
+**Quick start:**
+```bash
+cd dbt-cloud-orchestration
+cp .env.example .env
+# Edit .env with your credentials
+task dev -- .
+```
+
+See [`dbt-cloud-orchestration/README.md`](dbt-cloud-orchestration/README.md) for detailed setup.
+
+### dbx-project
+
+Databricks integration with:
+- Sling-based data ingestion
+- dbt transformations
+- Databricks job orchestration
+
+**Quick start:**
+```bash
+cd dbx-project
+uv sync
+dg dev
+```
+
+### dlt-project
+
+Data ingestion using DLT (Data Load Tool):
+- CSV to DuckDB ingestion
+- dbt transformations
+- Schedule-based automation
+
+**Quick start:**
+```bash
 cd dlt-project
+uv sync
+dg dev
+```
 
-# Download th csv fils
-curl -O https://raw.githubusercontent.com/dbt-labs/jaffle-shop-classic/refs/heads/main/seeds/raw_payments.csv
-curl -O https://raw.githubusercontent.com/dbt-labs/jaffle-shop-classic/refs/heads/main/seeds/raw_orders.csv
-curl -O https://raw.githubusercontent.com/dbt-labs/jaffle-shop-classic/refs/heads/main/seeds/raw_customers.csv
+### sling-project
 
-# Add Sling
-uv add dagster-sling
+Standalone Sling integration:
+- CSV to PostgreSQL replication
+- SQL Server integration examples
 
-# List the components
-dg list components
+**Quick start:**
+```bash
+cd sling-project
+uv sync
+kc pg-prepare  # Load sample data
+dg dev
+```
 
-# Scaffold the ingestion using Sling
-dg scaffold defs dagster_sling.SlingReplicationCollectionComponent ingestion
-# Note: This will create defs at dlt-project/src/dlt_project/defs/ingestion.
-# Then we edit the defs
+## Environment Variables Reference
 
-# We check the yaml 
-dg check yaml
+### dbt-cloud-orchestration
 
-# We list the defs
-dg list defs
+See [`dbt-cloud-orchestration/.env.example`](dbt-cloud-orchestration/.env.example) for the complete list.
 
-# We can now launch the new assets
-dg launch --assets target/main/raw_customers,target/main/raw_orders,target/main/raw_payments
+**Key variables:**
 
-# We can check the data is in Duckdb
-duckdb /tmp/jaffle_platform.duckdb -c "SELECT * FROM raw_orders LIMIT 5"
+| Variable | Description | Required For |
+|----------|-------------|--------------|
+| `DBT_CLOUD_TOKEN` | dbt Cloud API token | dbt code location |
+| `DBT_CLOUD_ACCOUNT_ID` | Your dbt Cloud account ID | dbt code location |
+| `DBT_CLOUD_PROJECT_ID` | dbt Cloud project ID | dbt code location |
+| `DBT_CLOUD_ENVIRONMENT_ID` | dbt Cloud environment ID | dbt code location |
+| `DATABRICKS_HOST` | Databricks workspace URL | Databricks features |
+| `DATABRICKS_TOKEN` | Databricks personal access token | Databricks features |
+| `DATABRICKS_WAREHOUSE_ID` | SQL warehouse ID | Databricks features |
+| `CSV_DATA_PATH` | Absolute path to data directory | Sling ingestion |
 
-# Now we clone the dbt project
-git clone --depth=1 https://github.com/dagster-io/jaffle-platform.git dbt && rm -rf dbt/.git
+### dbx-project
 
-# We add the dagster and duckdb dbt dependencies
-uv add dagster-dbt dbt-duckdb
+Uses `DATABRICKS_TOKEN` and `DATABRICKS_HOST` from environment or `.env` file.
 
-# List the components
-dg list components
+## Development Workflow
 
-# Scaffold the integration with the dbt project
-dg scaffold defs dagster_dbt.DbtProjectComponent jdbt --project-path dbt/jdbt
-# Note: This will create defs at dlt-project/src/dlt_project/defs/jdbt.
-# Then we edit the created defs. 
-# We add translation to align the asset keys with the Sling asset keys
+### Adding a New Project
 
-# We check the yaml 
-dg check yaml
+1. Create a new folder: `mkdir my-new-project`
+2. Initialize with `uvx create-dagster@latest project my-new-project`
+3. Add a `pyproject.toml` with dependencies
+4. Create a `README.md` with setup instructions
+5. Update the main `README.md` (this file) to include the new project
 
-# We list the defs
-dg list defs
+### Running Tests
 
-# We can now launch the new assets
-dg launch --assets target/main/stg_payments
+```bash
+# For a specific project
+kc test -- <project-folder>
 
-# We can check the data is in Duckdb
-duckdb /tmp/jaffle_platform.duckdb -c "SELECT * FROM stg_payments LIMIT 5"
+# Or manually
+cd <project-folder>
+uv run pytest -v
+```
 
-# Scaffold the schedule
-dg scaffold defs dagster.schedule jaffle_schedule.py
-# Note: This will create defs at dlt_project/defs/jaffle_schedule.py.
-# Then we edit the defs
+### Code Style
 
-# We check the defs
-# This checks all the definitions (not just the yaml ones)
-dg check defs
+This repository uses:
+- **ruff** for linting and formatting
+- **pyright** for type checking (in some projects)
+
+```bash
+# Run linting
+ruff check .
+
+# Run formatting
+ruff format .
+```
+
+## Troubleshooting
+
+### PostgreSQL Issues
+
+```bash
+# Check PostgreSQL status
+pg_ctl status -D .devbox/var/lib/postgres
+
+# Restart PostgreSQL
+pg_ctl restart -D .devbox/var/lib/postgres -l .devbox/var/log/postgres.log
+```
+
+### Port Already in Use
+
+Dagster will automatically try the next available port (3001, 3002, etc.). Check console output for the actual URL.
+
+### UV Sync Issues
+
+```bash
+# Clear uv cache
+uv cache clean
+
+# Re-sync
+uv sync
+```
+
+## Resources
+
+- [Dagster Documentation](https://docs.dagster.io/)
+- [Dagster University](https://courses.dagster.io/)
+- [Sling Documentation](https://docs.slingdata.io/)
+- [DLT Documentation](https://dlthub.com/docs/intro)
+- [dbt Cloud API Documentation](https://docs.getdbt.com/dbt-cloud/api-v2)
+- [Databricks Documentation](https://docs.databricks.com/)
+
+## Authoring Examples
+
+See [`AGENTS.md`](AGENTS.md) for detailed coding patterns and examples used across projects.
+
+## License
+
+This is a test/learning repository. See individual project dependencies for their respective licenses.
