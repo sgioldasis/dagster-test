@@ -29,3 +29,6 @@ directory_type = "project"
 
 [tool.dg.project]
 root_module = "dbt_orchestration"
+registry_modules = [
+    "dbt_orchestration.components.*",
+]

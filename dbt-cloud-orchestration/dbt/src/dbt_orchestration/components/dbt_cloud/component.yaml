@@ -1,0 +1,60 @@
+# =============================================================================
+# Dbt Cloud Orchestration Component Configuration
+# =============================================================================
+#
+# This YAML file configures the DbtCloudOrchestrationComponent which manages
+# dbt Cloud job orchestration and asset generation.
+#
+# Purpose:
+#   Define dbt Cloud workspace connection and orchestrate dbt Cloud jobs
+#   as Dagster assets with automatic polling and cross-location dependencies.
+#
+# Features:
+#   - Automatic asset generation from dbt Cloud manifest
+#   - Package-aware asset keys to avoid collisions
+#   - Polling sensor for dbt Cloud job status
+#   - Freshness policies for data quality
+#   - Cross-location dependency on fact_virtual from ingestion
+#
+# Dependencies:
+#   - fact_virtual: Source asset from ingestion code location
+#
+# =============================================================================
+
+type: dbt_orchestration.DbtCloudOrchestrationComponent
+
+attributes:
+  # ==========================================================================
+  # Dbt Cloud Workspace Configuration
+  # ==========================================================================
+  # Connection details for dbt Cloud workspace
+  # All sensitive values should be set via environment variables
+  # ==========================================================================
+  workspace:
+    account_id: 413
+    project_id: 10157
+    environment_id: 26829
+    access_url: "https://tw590.eu1.dbt.com"
+    token: "{{ env('DBT_CLOUD_TOKEN') }}"
+
+  # ==========================================================================
+  # Runtime Configuration
+  # ==========================================================================
+  timeout_seconds: 600
+
+  # ==========================================================================
+  # Target Asset Configuration
+  # ==========================================================================
+  # The target asset key for Kaizen Wars fact_virtual
+  # This asset will have cross-location dependency on fact_virtual
+  # ==========================================================================
+  target_key: "stg_kaizen_wars__fact_virtual"
+
+  # ==========================================================================
+  # Freshness Policy Configuration
+  # ==========================================================================
+  # Deadline: 6:00 AM daily
+  # Lower bound: 24 hours (1440 minutes)
+  # ==========================================================================
+  freshness_deadline_cron: "0 6 * * *"
+  freshness_lower_bound_minutes: 1440
