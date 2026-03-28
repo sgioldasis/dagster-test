@@ -1,0 +1,36 @@
+# Dbt Cloud Orchestration Component Configuration
+#
+# This component extends the built-in DbtCloudComponent to:
+# - Fix a credentials typing bug in dagster_dbt
+# - Add package-aware asset keys to avoid collisions
+# - Set up cross-location dependencies on ingestion assets
+# - Configure freshness policies for data quality
+
+type: dbt_orchestration.components.dbt_cloud.component.DbtCloudOrchestrationComponent
+
+attributes:
+  # Dbt Cloud Workspace Configuration
+  workspace:
+    credentials:
+      account_id: 413
+      access_url: "https://tw590.eu1.dbt.com"
+      token: "{{ env('DBT_CLOUD_TOKEN') }}"
+    project_id: 10157
+    environment_id: 26829
+
+  # dbt CLI Arguments
+  cli_args: ["build"]
+
+  # Translation Settings
+  translation_settings:
+    enable_source_tests_as_checks: false
+
+  # Target Asset Configuration
+  target_key: "stg_kaizen_wars__fact_virtual"
+
+  # Freshness Policy Configuration
+  freshness_deadline_cron: "0 6 * * *"
+  freshness_lower_bound_minutes: 1440
+
+  # Asset Group Configuration
+  group_name: "dbtcloud"
