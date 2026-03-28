@@ -32,28 +32,20 @@ Architecture:
 """
 
 # Standard library
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
-
-# Third party
-from databricks.sdk.service.jobs import RunResultState
 
 # Dagster
 import dagster as dg
 from dagster import (
-    AssetExecutionContext,
     AssetKey,
-    AutomationCondition,
     AutomationConditionSensorDefinition,
-    EnvVar,
-    Field,
     build_last_update_freshness_checks,
 )
 from dagster.components import build_component_defs
 
 # Local imports
-from ingestion.config import get_settings
-from ingestion.defs.resources import DatabricksCredentials, PostgresCredentials
+from ingestion.defs.resources import PostgresCredentials
 
 
 def _build_sensors() -> list[dg.SensorDefinition]:
@@ -115,111 +107,6 @@ def _build_freshness_checks() -> list:
     return list(csv_freshness) + list(fact_freshness)
 
 
-@dg.asset(
-    key="run_databricks_ingestion_job",
-    group_name="ingestion",
-    automation_condition=AutomationCondition.eager(),
-    freshness_policy=dg.FreshnessPolicy.time_window(
-        fail_window=timedelta(minutes=5),
-        warn_window=timedelta(minutes=2),
-    ),
-    tags={"dagster/icon": "schedule", "databricks": "ingestion"},
-    compute_kind="databricks",
-    config_schema={
-        "start_date": Field(
-            str,
-            default_value=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-            description="Start date for Databricks job (YYYY-MM-DD format)",
-        ),
-        "end_date": Field(
-            str,
-            default_value=datetime.now().strftime("%Y-%m-%d"),
-            description="End date for Databricks job (YYYY-MM-DD format)",
-        ),
-    },
-)
-def databricks_run_databricks_ingestion_job_asset(
-    context: AssetExecutionContext,
-    databricks: dg.ResourceParam[DatabricksCredentials],
-) -> dict:
-    """Trigger a Databricks notebook job with configurable date parameters.
-
-    This asset demonstrates how to orchestrate external Databricks jobs from
-    within Dagster. It submits a job run, polls for completion, and returns
-    the execution results.
-
-    Args:
-        context: Asset execution context for logging and config access
-        databricks: Configured Databricks credentials resource
-
-    Returns:
-        Dictionary with run_id and status of the Databricks job
-    """
-    config = context.op_config or {}
-    start_date = config.get("start_date") or (
-        datetime.now() - timedelta(days=1)
-    ).strftime("%Y-%m-%d")
-    end_date = config.get("end_date") or datetime.now().strftime("%Y-%m-%d")
-
-    context.log.info(
-        f"Triggering Databricks job with start_date={start_date}, end_date={end_date}"
-    )
-
-    # Skip if no Databricks credentials configured (allows testing without Databricks)
-    if not databricks:
-        context.log.warning("No Databricks credentials provided - skipping job trigger")
-        return {"run_id": "skipped", "status": "success"}
-
-    job_id_str = databricks.notebook_job_id
-    if not job_id_str:
-        context.log.warning(
-            "No Databricks notebook job ID provided - skipping job trigger"
-        )
-        return {"run_id": "skipped", "status": "success"}
-
-    client_wrapper = databricks.get_client()
-    client = client_wrapper.workspace_client
-
-    # Submit the job run with date parameters
-    run_response = client.jobs.run_now(
-        job_id=int(job_id_str),
-        job_parameters={
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-    )
-
-    run_id = run_response.run_id
-    context.log.info(f"Job submitted, run_id: {run_id}")
-
-    # Wait for job completion using SDK's built-in polling
-    run = client.jobs.wait_get_run_job_terminated_or_skipped(
-        run_id=run_id,
-        timeout=timedelta(seconds=600),
-    )
-
-    if run.state.result_state == RunResultState.SUCCESS:
-        context.log.info(f"Job {run_id} completed successfully")
-
-        # Try to fetch and log job output
-        try:
-            output_data = client.jobs.get_run_output(run_id)
-            if output_data.logs:
-                context.log.info(f"Job logs: {output_data.logs}")
-            if output_data.notebook_output:
-                result = output_data.notebook_output.result
-                if result:
-                    context.log.info(f"Notebook result: {result}")
-        except Exception as e:
-            context.log.warning(f"Could not fetch job output: {e}")
-
-        return {"run_id": run_id, "status": "success"}
-    else:
-        raise RuntimeError(
-            f"Job {run_id} failed: {run.state.state_message or 'Unknown error'}"
-        )
-
-
 def _build_resources() -> dict[str, dg.ResourceDefinition]:
     """Build all resources for the ingestion pipeline.
 
@@ -228,19 +115,7 @@ def _build_resources() -> dict[str, dg.ResourceDefinition]:
     Returns:
         Dictionary of resource definitions.
     """
-    settings = get_settings()
-
-    databricks_resource = DatabricksCredentials(
-        host=EnvVar("DATABRICKS_HOST"),
-        warehouse_id=settings.databricks_warehouse_id,
-        http_path=settings.databricks_http_path,
-        catalog=settings.databricks_catalog,
-        schema_name=settings.databricks_schema,
-        notebook_job_id=settings.databricks_notebook_job_id,
-    )
-
     return {
-        "databricks": databricks_resource,
         "postgres": PostgresCredentials(),
     }
 
@@ -268,7 +143,6 @@ def get_definitions() -> dg.Definitions:
     merged_defs = dg.Definitions.merge(
         component_defs,
         dg.Definitions(
-            assets=[databricks_run_databricks_ingestion_job_asset],
             asset_checks=freshness_checks,
             resources=_build_resources(),
             sensors=_build_sensors(),

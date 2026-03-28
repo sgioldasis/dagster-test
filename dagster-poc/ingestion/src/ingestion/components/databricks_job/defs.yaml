@@ -1,0 +1,46 @@
+# Databricks Job Component
+#
+# This component triggers external Databricks notebook jobs from Dagster.
+# It submits a job run with configurable parameters, polls for completion,
+# and returns results.
+#
+# Configuration:
+#   - spec: Asset spec for the job asset (key, group_name, automation_condition, etc.)
+#   - job_id: Databricks job ID to trigger
+#   - host: Databricks workspace host
+#   - token: Personal access token for authentication
+#   - job_parameters: Dictionary of parameters passed to the Databricks job
+#   - timeout_seconds: Maximum wait time for job completion (default: 600)
+#
+# The component automatically provides default values for start_date and end_date
+# if not specified in job_parameters:
+#   - start_date: yesterday's date (YYYY-MM-DD)
+#   - end_date: today's date (YYYY-MM-DD)
+#
+# Required Environment Variables:
+#   - DATABRICKS_HOST: Databricks workspace host (e.g., adb-xxx.azuredatabricks.net)
+#   - DATABRICKS_TOKEN: Personal access token
+#   - DATABRICKS_NOTEBOOK_JOB_ID: Job ID to trigger
+
+type: ingestion.components.databricks_job.DatabricksJobComponent
+
+attributes:
+  spec:
+    key: run_databricks_ingestion_job
+    group_name: ingestion
+    automation_condition: "{{ dg.AutomationCondition.eager() }}"
+    tags:
+      dagster/icon: schedule
+      databricks: ingestion
+
+  job_id: "{{ env.DATABRICKS_NOTEBOOK_JOB_ID }}"
+  host: "{{ env.DATABRICKS_HOST }}"
+  token: "{{ env.DATABRICKS_TOKEN }}"
+
+  job_parameters:
+    # Date range for the ingestion job
+    # Leave empty to use defaults (yesterday to today)
+    start_date: ""
+    end_date: ""
+
+  timeout_seconds: 600
