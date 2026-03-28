@@ -27,7 +27,7 @@ cd <project-folder> && if [ -f workspace.yaml ]; then dg dev --workspace workspa
 - `dlt-project` - Dagster + dlt integration (Python 3.9-3.13)
 - `dbx-project` - Dagster + Databricks integration (Python 3.10-3.13)
 - `sling-project` - Dagster + Sling integration
-- `dbt-cloud-orchestration` - Dagster + dbt Cloud orchestration (Python 3.10-3.14)
+- `dagster-poc` - Dagster + dbt Cloud orchestration (Python 3.10-3.14)
 
 ## Code Style Guidelines
 

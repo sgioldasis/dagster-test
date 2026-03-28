@@ -8,7 +8,7 @@ This repository contains the following independent projects:
 
 | Project | Description | Python Version |
 |---------|-------------|----------------|
-| [`dbt-cloud-orchestration/`](dbt-cloud-orchestration/) | Multi-team dbt Cloud orchestration with ingestion, dbt Cloud integration, and downstream analytics | 3.10 - 3.14 |
+| [`dagster-poc/`](dagster-poc/) | Multi-team dbt Cloud orchestration with ingestion, dbt Cloud integration, and downstream analytics | 3.10 - 3.14 |
 | [`dbx-project/`](dbx-project/) | Dagster + Databricks integration with Sling ingestion and dbt transformations | 3.10 - 3.13 |
 | [`dlt-project/`](dlt-project/) | Dagster + DLT (Data Load Tool) integration for data ingestion | 3.9 - 3.13 |
 | [`dbt-cloud/`](dbt-cloud/) | Simple dbt Cloud integration example | - |
@@ -31,7 +31,7 @@ This repository contains the following independent projects:
 Some projects require environment variables. Add these to your `.bashrc` or `.zshrc` if needed:
 
 ```bash
-# Databricks (for dbx-project and dbt-cloud-orchestration)
+# Databricks (for dbx-project and dagster-poc)
 export DATABRICKS_TOKEN=<your_databricks_token>
 export DATABRICKS_HOST=<your_databricks_host>
 
@@ -57,11 +57,11 @@ This will:
 
 Each project has its own setup. See the project-specific README files for details.
 
-**Example - Run dbt-cloud-orchestration:**
+**Example - Run dagster-poc:**
 
 ```bash
 # Navigate to the project
-cd dbt-cloud-orchestration
+cd dagster-poc
 
 # Copy environment variables
 cp .env.example .env
@@ -81,7 +81,7 @@ kc
 
 # Sync dependencies for a project
 kc sync -- <project-folder>
-# Example: kc sync -- dbt-cloud-orchestration
+# Example: kc sync -- dagster-poc
 
 # Run Dagster dev server
 kc dev -- <project-folder>
@@ -104,7 +104,7 @@ kc ddb
 ```
 dagster-test/                          # Repository Root
 ├── .devbox/                           # Devbox configuration and data
-├── dbt-cloud-orchestration/           # Multi-team dbt Cloud orchestration
+├── dagster-poc/                       # Multi-team dbt Cloud orchestration
 │   ├── ingestion/                     # Team 1: Data ingestion (Sling/DLT)
 │   ├── dbt/                           # Team 2: dbt Cloud integration
 │   ├── downstream/                    # Team 3: Downstream analytics
@@ -155,7 +155,7 @@ sling conns list
 
 ## Project Details
 
-### dbt-cloud-orchestration
+### dagster-poc
 
 The most complex project demonstrating multi-team collaboration:
 
@@ -165,13 +165,13 @@ The most complex project demonstrating multi-team collaboration:
 
 **Quick start:**
 ```bash
-cd dbt-cloud-orchestration
+cd dagster-poc
 cp .env.example .env
 # Edit .env with your credentials
 task dev -- .
 ```
 
-See [`dbt-cloud-orchestration/README.md`](dbt-cloud-orchestration/README.md) for detailed setup.
+See [`dagster-poc/README.md`](dagster-poc/README.md) for detailed setup.
 
 ### dbx-project
 
@@ -217,9 +217,9 @@ dg dev
 
 ## Environment Variables Reference
 
-### dbt-cloud-orchestration
+### dagster-poc
 
-See [`dbt-cloud-orchestration/.env.example`](dbt-cloud-orchestration/.env.example) for the complete list.
+See [`dagster-poc/.env.example`](dagster-poc/.env.example) for the complete list.
 
 **Key variables:**
 

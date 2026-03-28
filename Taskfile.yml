@@ -23,7 +23,7 @@ tasks:
       - uv sync --all-packages --all-groups
     preconditions:
       - sh: 'test -n "{{.CLI_ARGS}}"'
-        msg: "Error: <folder> argument is required. Example: task sync-all -- dbt-cloud-orchestration"
+        msg: "Error: <folder> argument is required. Example: task sync-all -- dagster-poc"
 
 
   dg-dev:
@@ -66,3 +66,30 @@ tasks:
     dir: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.USER_WORKING_DIR}}{{end}}"
     cmds:
       - uv run pytest -v
+
+  upgrade:
+    desc: "Upgrade all packages (updates lockfile then syncs). Usage: task upgrade -- <folder>"
+    dir: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.USER_WORKING_DIR}}{{end}}"
+    cmds:
+      - uv lock --upgrade
+      - uv sync
+
+  upgrade-all:
+    desc: "Upgrade all packages across workspace (updates lockfile then syncs). Usage: task upgrade-all -- <folder>"
+    dir: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.USER_WORKING_DIR}}{{end}}"
+    cmds:
+      - uv lock --upgrade
+      - uv sync --all-packages --all-groups
+
+  upgrade-package:
+    desc: "Upgrade specific package(s) (updates lockfile then syncs). Usage: task upgrade-package -- <package1> <package2>"
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - |
+        packages="{{.CLI_ARGS}}"
+        if [ -z "$packages" ]; then
+          echo "Error: Package name(s) required. Example: task upgrade-package -- dagster dagster-webserver"
+          exit 1
+        fi
+        uv lock --upgrade-package $packages
+        uv sync
