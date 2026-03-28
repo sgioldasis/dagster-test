@@ -9,13 +9,17 @@
 #   - job_id: Databricks job ID to trigger
 #   - host: Databricks workspace host
 #   - token: Personal access token for authentication
-#   - job_parameters: Dictionary of parameters passed to the Databricks job
+#   - job_parameters: Static dictionary of parameters passed to the Databricks job
 #   - timeout_seconds: Maximum wait time for job completion (default: 600)
 #
-# The component automatically provides default values for start_date and end_date
-# if not specified in job_parameters:
-#   - start_date: yesterday's date (YYYY-MM-DD)
-#   - end_date: today's date (YYYY-MM-DD)
+# Partition Configuration (for scheduled/recurring runs):
+#   - partition_start_date: Start date for daily partitions (YYYY-MM-DD)
+#   - partition_end_date: End date for daily partitions (optional)
+#   - partition_end_offset: Number of days beyond current time (default: 1)
+#
+# Runtime Configuration (UI-configurable at launch):
+#   - start_date: Start date for the ingestion job (YYYY-MM-DD), defaults to yesterday
+#   - end_date: End date for the ingestion job (YYYY-MM-DD), defaults to today
 #
 # Required Environment Variables:
 #   - DATABRICKS_HOST: Databricks workspace host (e.g., adb-xxx.azuredatabricks.net)
@@ -37,10 +41,14 @@ attributes:
   host: "{{ env.DATABRICKS_HOST }}"
   token: "{{ env.DATABRICKS_TOKEN }}"
 
+  # Static parameters passed to the Databricks job (in addition to dates)
   job_parameters:
-    # Date range for the ingestion job
-    # Leave empty to use defaults (yesterday to today)
-    start_date: ""
-    end_date: ""
+    environment: "production"
 
   timeout_seconds: 600
+
+  # Partition configuration for scheduled runs
+  # The asset will be partitioned by day, allowing backfills and scheduled runs
+  partition_start_date: "2024-01-01"
+  # partition_end_date: "2025-12-31"  # Optional: leave unset to use current date
+  partition_end_offset: 1  # Include today + 1 day for lookahead
