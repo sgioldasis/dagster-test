@@ -1,0 +1,26 @@
+# Databricks Transform Job
+#
+# This job triggers the external Databricks notebook for data transformation.
+# It can depend on the ingestion job to run after data is loaded.
+
+type: ingestion.components.databricks_job.DatabricksJobComponent
+
+attributes:
+  spec:
+    key: run_databricks_transform_job
+    group_name: transformation
+    automation_condition: "{{ dg.AutomationCondition.any_deps_match(dg.AutomationCondition.newly_updated()) }}"
+    deps: ["run_databricks_ingestion_job"]
+    tags:
+      dagster/icon: schedule
+      databricks: transformation
+
+  job_id: 893110440009014
+  host: "{{ env.DATABRICKS_HOST }}"
+  token: "{{ env.DATABRICKS_TOKEN }}"
+
+  job_parameters:
+    source_table: "raw_data"
+    target_table: "transformed_data"
+
+  timeout_seconds: 900

@@ -24,31 +24,15 @@
 # Required Environment Variables:
 #   - DATABRICKS_HOST: Databricks workspace host (e.g., adb-xxx.azuredatabricks.net)
 #   - DATABRICKS_TOKEN: Personal access token
-#   - DATABRICKS_NOTEBOOK_JOB_ID: Job ID to trigger
-
-type: ingestion.components.databricks_job.DatabricksJobComponent
-
-attributes:
-  spec:
-    key: run_databricks_ingestion_job
-    group_name: ingestion
-    automation_condition: "{{ dg.AutomationCondition.eager() }}"
-    tags:
-      dagster/icon: schedule
-      databricks: ingestion
-
-  job_id: "{{ env.DATABRICKS_NOTEBOOK_JOB_ID }}"
-  host: "{{ env.DATABRICKS_HOST }}"
-  token: "{{ env.DATABRICKS_TOKEN }}"
-
-  # Static parameters passed to the Databricks job (in addition to dates)
-  job_parameters:
-    environment: "production"
-
-  timeout_seconds: 600
-
-  # Partition configuration for scheduled runs
-  # The asset will be partitioned by day, allowing backfills and scheduled runs
-  partition_start_date: "2024-01-01"
-  # partition_end_date: "2025-12-31"  # Optional: leave unset to use current date
-  partition_end_offset: 1  # Include today + 1 day for lookahead
+#
+# Job-specific environment variables:
+#   - DATABRICKS_NOTEBOOK_JOB_ID: Job ID for ingestion job
+#   - DATABRICKS_TRANSFORM_JOB_ID: Job ID for transform job
+#
+# Jobs are defined in subdirectories:
+#   - ingestion_job/defs.yaml - Data ingestion job
+#   - transform_job/defs.yaml - Data transformation job
+#
+# To add a new job, create a new subdirectory with a defs.yaml file:
+#   mkdir my_new_job
+#   # create my_new_job/defs.yaml with your configuration

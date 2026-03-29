@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import dagster as dg
-from dagster import AssetExecutionContext, AssetSpec, MaterializeResult
+from dagster import AssetExecutionContext, AssetOut, AssetSpec, MaterializeResult
 from databricks.sdk.service.jobs import RunResultState
 from pydantic import Field
 
@@ -76,10 +76,10 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
     token: str
     job_parameters: dict[str, Any] = Field(default_factory=dict)
     timeout_seconds: int = 600
-    # Partition configuration
-    partition_start_date: str = Field(
-        default="2024-01-01",
-        description="Start date for daily partitions (YYYY-MM-DD)"
+    # Partition configuration - set to None to disable partitioning
+    partition_start_date: str | None = Field(
+        default=None,
+        description="Start date for daily partitions (YYYY-MM-DD). Set to None to disable partitioning."
     )
     partition_end_date: str | None = Field(
         default=None,
@@ -233,6 +233,8 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
 
     def _create_partitions_def(self) -> dg.DailyPartitionsDefinition | None:
         """Create daily partitions definition if partition dates are configured."""
+        if self.partition_start_date is None:
+            return None
         try:
             end_date = self.partition_end_date or datetime.now().strftime("%Y-%m-%d")
             return dg.DailyPartitionsDefinition(
@@ -257,15 +259,22 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
         spec = self.spec
         partitions_def = self._create_partitions_def()
 
-        # Build decorator kwargs
+        # Build decorator kwargs for @asset
         decorator_kwargs: dict[str, Any] = {
-            "specs": [spec],
+            "key": spec.key,
+            "group_name": spec.group_name,
             "compute_kind": "databricks",
+            "metadata": spec.metadata,
+            "tags": spec.tags,
         }
         if partitions_def:
             decorator_kwargs["partitions_def"] = partitions_def
+        if spec.automation_condition:
+            decorator_kwargs["automation_condition"] = spec.automation_condition
+        if spec.deps:
+            decorator_kwargs["deps"] = spec.deps
 
-        @dg.multi_asset(**decorator_kwargs)
+        @dg.asset(**decorator_kwargs)
         def databricks_job_asset(
             context: AssetExecutionContext,
             config: DatabricksJobConfig,
