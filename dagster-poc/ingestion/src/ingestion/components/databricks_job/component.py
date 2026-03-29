@@ -176,12 +176,12 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
         client = self._get_client()
 
         # Submit the job run with parameters
-        # Note: For notebook tasks, use notebook_params instead of job_parameters
+        # Note: Use job_parameters for jobs configured with job parameters
         try:
             context.log.info(f"Calling jobs.run_now with job_id={job_id}")
             run_response = client.jobs.run_now(
                 job_id=int(job_id),
-                notebook_params=params,
+                job_parameters=params,
             )
             run_id = run_response.run_id
             context.log.info(f"Job submitted successfully, run_id: {run_id}")
@@ -205,6 +205,7 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
             context.log.info(f"Job {run_id} completed successfully")
 
             # Try to fetch and log job output
+            # For multi-task jobs, fetch output from each task individually
             try:
                 output_data = client.jobs.get_run_output(run_id)
                 if output_data.logs:
@@ -214,7 +215,28 @@ class DatabricksJobComponent(dg.Component, dg.Resolvable, dg.Model):
                     if result:
                         context.log.info(f"Notebook result: {result}")
             except Exception as e:
-                context.log.warning(f"Could not fetch job output: {e}")
+                error_msg = str(e)
+                if "multiple tasks" in error_msg.lower():
+                    context.log.info("Multi-task job detected - fetching output from individual tasks")
+                    try:
+                        # Get run details to fetch individual task outputs
+                        run_details = client.jobs.get_run(run_id)
+                        if run_details.tasks:
+                            for task in run_details.tasks:
+                                task_key = task.task_key
+                                task_run_id = task.run_id
+                                try:
+                                    task_output = client.jobs.get_run_output(task_run_id)
+                                    if task_output.logs:
+                                        context.log.info(f"Task '{task_key}' logs: {task_output.logs}")
+                                    if task_output.notebook_output and task_output.notebook_output.result:
+                                        context.log.info(f"Task '{task_key}' result: {task_output.notebook_output.result}")
+                                except Exception as task_e:
+                                    context.log.warning(f"Could not fetch output for task '{task_key}': {task_e}")
+                    except Exception as multi_e:
+                        context.log.warning(f"Could not fetch multi-task job details: {multi_e}")
+                else:
+                    context.log.warning(f"Could not fetch job output: {e}")
 
             return MaterializeResult(
                 metadata={

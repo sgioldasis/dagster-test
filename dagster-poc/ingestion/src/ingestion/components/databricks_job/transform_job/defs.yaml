@@ -20,7 +20,7 @@ attributes:
   token: "{{ env.DATABRICKS_TOKEN }}"
 
   job_parameters:
-    source_table: "raw_data"
-    target_table: "transformed_data"
+    source_table: "source_t"
+    target_table: "target_t"
 
   timeout_seconds: 900
