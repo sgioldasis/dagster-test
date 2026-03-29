@@ -17,7 +17,10 @@ from dagster_sling import (
     SlingResource,
 )
 
-from ingestion.components.ingestion_sling.config_resolver import process_replication_config
+from ingestion.components.ingestion_sling.config_resolver import (
+    process_replication_config,
+    resolve_env_vars,
+)
 from ingestion.components.ingestion_sling.translator import IngestionSlingTranslator
 
 
@@ -101,12 +104,10 @@ class IngestionSlingComponent(SlingReplicationCollectionComponent):
                 conn_dict["name"] = conn.name
 
             # Resolve environment variables in connection properties
+            # Supports: {{ env.VAR }}, {{ env('VAR') }}, {{ env('VAR', 'default') }}, ${VAR}, ${VAR:-default}, env:VAR
             for key, value in conn_dict.items():
                 if isinstance(value, str):
-                    if value.startswith("env:"):
-                        conn_dict[key] = os.environ.get(value[4:], "")
-                    elif value.startswith("${") and value.endswith("}"):
-                        conn_dict[key] = os.environ.get(value[2:-1], "")
+                    conn_dict[key] = resolve_env_vars(value)
 
             # Auto-construct Databricks http_path if warehouse_id is provided
             if conn_dict.get("type") == "databricks":

@@ -12,10 +12,21 @@ from typing import Any
 import yaml
 
 
+# Jinja2-style env variable pattern: {{ env.VAR }} or {{ env('VAR') }} or {{ env('VAR', 'default') }}
+JINJA_ENV_PATTERN = re.compile(
+    r'\{\{\s*env\s*(?:\.(\w+)|\(\s*[\'\"](\w+)[\'\"](?:\s*,\s*[\'\"]([^\'\"]*)[\'\"])?\s*\))\s*\}\}'
+)
+# Shell-style env variable pattern: ${ENV_VAR} or ${ENV_VAR:-default}
+SHELL_ENV_PATTERN = re.compile(r'\$\{([^}]+)\}')
+
+
 def resolve_env_vars(value: Any) -> Any:
     """Resolve environment variables in a value.
 
-    Replaces ${ENV_VAR} or ${ENV_VAR:-default} placeholders with values.
+    Supports:
+    - Jinja2-style: {{ env.VAR }}, {{ env('VAR') }}, {{ env('VAR', 'default') }}
+    - Shell-style: ${ENV_VAR}, ${ENV_VAR:-default}
+    - Legacy env: prefix: env:VAR (for backward compatibility)
 
     Args:
         value: Value to resolve (str, dict, list, or other).
@@ -24,16 +35,34 @@ def resolve_env_vars(value: Any) -> Any:
         Value with environment variables resolved.
     """
     if isinstance(value, str):
-        pattern = r'\$\{([^}]+)\}'
+        # Handle legacy env: prefix (for backward compatibility)
+        if value.startswith("env:"):
+            return os.environ.get(value[4:], "")
 
-        def replace_env_var(match: re.Match) -> str:
+        # Handle Jinja2-style {{ env.VAR }} or {{ env('VAR', 'default') }}
+        def replace_jinja_env(match: re.Match) -> str:
+            # Group 1: env.VAR syntax (dot notation)
+            # Group 2: env('VAR') syntax - variable name
+            # Group 3: env('VAR', 'default') syntax - default value
+            var_name = match.group(1) or match.group(2)
+            default = match.group(3) or ""
+            if var_name:
+                return os.environ.get(var_name, default)
+            return match.group(0)  # Return original if no match
+
+        result = JINJA_ENV_PATTERN.sub(replace_jinja_env, value)
+
+        # Handle shell-style ${ENV_VAR} or ${ENV_VAR:-default}
+        def replace_shell_env(match: re.Match) -> str:
             env_expr = match.group(1)
             if ':-' in env_expr:
                 var_name, default = env_expr.split(':-', 1)
                 return os.environ.get(var_name, default)
             return os.environ.get(env_expr, '')
 
-        return re.sub(pattern, replace_env_var, value)
+        result = SHELL_ENV_PATTERN.sub(replace_shell_env, result)
+        return result
+
     elif isinstance(value, dict):
         return {resolve_env_vars(k): resolve_env_vars(v) for k, v in value.items()}
     elif isinstance(value, list):
